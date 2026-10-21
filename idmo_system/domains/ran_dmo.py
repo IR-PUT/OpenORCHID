@@ -2,7 +2,7 @@ import asyncio
 import json
 
 from idmo_system.communication.api import UnityRanCapabilities
-from idmo_system.domains.base_domain import BaseDomainBroker
+from idmo_system.domains.base_domain import BaseDomainBroker, FeasibilityResult
 from idmo_system.domains.behavior import RanBehavior
 from loguru import logger
 
@@ -24,13 +24,31 @@ class RANDomainBroker(BaseDomainBroker):
         self._telemetry_tasks = {}
 
     async def handle_feasibility(self, data):
-        max_bw = self.behavior.max_bandwidth_mhz
-        requested_bw = data.get("rfs_ran", {}).get("bandwidth_mhz") or 0
-        is_ok = requested_bw <= max_bw
-        proposals = None if is_ok else {"bandwidth_mhz": max_bw}
-        return is_ok, proposals
+        rfs = data.get("rfs_ran") or {}
+        reasons = []
+
+        tac = rfs.get("tac")
+        if tac is not None and tac not in [ta[2] for ta in self.capabilities["coverageAreaTAList"]]:
+            reasons.append(f"TA {tac} not covered")
+
+        free_bw = self.behavior.max_bandwidth_mhz - self.reserved("bandwidth_mhz")
+        requested_bw = rfs.get("bandwidth_mhz") or 0
+        if requested_bw > free_bw:
+            reasons.append(f"{requested_bw:g} MHz requested, {free_bw:g} MHz available")
+
+        free_ues = self.capabilities["maxNumberofUEs"] - self.reserved("num_ues")
+        requested_ues = rfs.get("num_ues") or 0
+        if requested_ues > free_ues:
+            reasons.append(f"{requested_ues} UEs requested, {free_ues:g} available")
+
+        if reasons:
+            return FeasibilityResult(False, proposals={"bandwidth_mhz": free_bw, "num_ues": free_ues},
+                                     reason="; ".join(reasons))
+        return FeasibilityResult(True)
 
     async def handle_provisioning(self, data):
+        rfs = data.get("rfs_ran") or {}
+        self.reserve(data["intent_id"], bandwidth_mhz=rfs.get("bandwidth_mhz") or 0, num_ues=rfs.get("num_ues") or 0)
         return f"ran_slice_{data['intent_id']}"
     
     async def setup_telemetry(self, data, service_topic):

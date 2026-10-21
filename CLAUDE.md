@@ -28,12 +28,16 @@ as a showcase: don't over-engineer and don't import concepts from the private ve
   — the single source of RFS field names). Bus messages are plain dicts (`model_dump()`).
 - `core/domain_capability_registration.py`: in-memory domain registry, heartbeat timeout → `domain.heartbeat_lost`
   + topic cleanup; answers `domain.inventory.query` (NATS request/reply). Domain ID = sanitized unique `domain_name`.
+  Status `PENDING` → `UP` on first heartbeat → `DOWN`/deleted on timeout.
 - `core/service_orchestrator.py`: `ServiceOrchestrator` + per-intent `ServiceSaga`
-  (PREPARATION→COMMISSIONING→OPERATION→DECOMMISSIONING, or REJECTED). Picks first UP ran/core domain; lifetime = `rfs_ran.duration_s` (default 60 s).
+  (PREPARATION→COMMISSIONING→OPERATION→DECOMMISSIONING, or REJECTED); lifetime = `rfs_ran.duration_s` (default 60 s).
+  Preparation: `core/domain_selection.py` filters + ranks (RAN, CORE) pairs, saga asks them one by one (`attempt`
+  numbers, timeout) up to `max_candidates`. Load for `least_loaded` = orchestrator's own count of active sagas.
 - `core/sla_monitor.py`: compares `ServiceTelemetryReport` vs RFS, publishes `intent.status.update` (STATE_COMPLIES/DEGRADES) and `sls.violation`.
 - `domains/base_domain.py` `BaseDomainBroker` (Kafka only): register → heartbeats → feasibility/provisioning on
   `to.` topic (read from `earliest`), termination on service topic. `ran_dmo.py` / `core_dmo.py` take
-  capabilities (api.py models) + behaviour (`domains/behavior.py`: RAN `max_bandwidth_mhz`, constant telemetry; CORE always OK).
+  capabilities (api.py models) + behaviour (`domains/behavior.py`). `handle_feasibility` returns `FeasibilityResult`;
+  `reserve()`/`release()` track per-intent resources (released automatically on termination).
 - `gateway/intent_gateway.py`: `create_app(nats_url, translator)` → FastAPI `POST /intents` (`expression` or structured `rfs`),
   `GET /intents[/{id}]`; ISR in `app.state`, updated from `intent.status.update`.
   `gateway/translator.py`: Ollama `/api/generate` with JSON-schema `format`.
@@ -43,8 +47,10 @@ NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `do
 `domain.inventory.query`, `feasibility.check.{request,response}`, `service.order.request.dispatch`, `service.order.terminate`,
 `service.change.status`, `service.telemetry.report`, `monitor.service.{start,stop}`, `sls.violation`, `intent.status.update`, `clean.topics`.
 
-## Known issues (after Stage 1, 2026-10)
-- Domain selection = first UP domain, capabilities ignored (→ Stage 2), so in `multi_domain` every intent lands on the same RAN.
-- No fault injection / telemetry profiles yet (→ Stage 3). Recovery is TODO (`process_fault`, `_handle_service_recovery`).
+## Known issues (after Stage 2, 2026-10)
+- Resources reserved at provisioning, not at feasibility → concurrent sagas can overbook a domain.
+- No fault injection / telemetry profiles yet (→ Stage 3). Recovery is TODO (`process_fault`, `_handle_service_recovery`);
+  on domain loss the surviving domain keeps its reservation.
 - Domain brokers' background tasks are not tracked/cancelled by the runner (harmless with `asyncio.run`, matters for tests).
+- MBA creates topics sequentially with 1 s sleeps → ~2 s per domain until it is UP (startup of large scenarios is slow).
 - `main.py` is stale (→ removed in Stage 4).

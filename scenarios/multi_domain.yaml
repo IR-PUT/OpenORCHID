@@ -1,8 +1,8 @@
-# Several RAN profiles and two CORE domains, intents with different requirements.
-# NOTE: until capability-based domain selection is implemented (PLAN.md, Stage 2),
-# the orchestrator picks the first available RAN and CORE.
+# Several RAN profiles and two CORE domains. The intents are chosen so that each orchestration
+# mechanism shows up in the result: link-latency filtering, capacity accounting in the domains,
+# retrying the next (RAN, CORE) candidate, and the CORE service limit.
 name: multi_domain
-description: URBAN / RURAL / SUBURBAN RAN profiles, two CORE domains, accepted, rejected and degraded intents.
+description: URBAN / RURAL / SUBURBAN RAN profiles, central and edge CORE, lowest-latency selection with retries.
 
 runtime:
   duration_s: 90
@@ -10,6 +10,10 @@ runtime:
 registry:
   heartbeat_interval_s: 5
   max_missed_heartbeats: 3
+
+orchestrator:
+  domain_selection: lowest_latency   # first_available | least_loaded | lowest_latency | random
+  max_candidates: 5                  # (RAN, CORE) pairs tried before the intent is rejected
 
 domains:
   - name: core-central
@@ -19,6 +23,8 @@ domains:
   - name: core-edge
     type: core
     capabilities: { cpu: 16, memory_gb: 64, storage_gb: 500, maxNumberofUEs: 5000 }
+    behavior:
+      max_services: 2                # small edge site
 
   - name: ran-urban
     type: ran
@@ -27,9 +33,9 @@ domains:
       nROperatingBands: [n78, n258]
       coverageAreaTAList: [[260, 6, 1000], [260, 6, 2000]]
       positioning: true
-      core_links: { core-central: 8.0, core-edge: 2.0 }
+      core_links: { core-central: 8.0, core-edge: 2.0 }   # link latency [ms]
     behavior:
-      max_bandwidth_mhz: 400
+      max_bandwidth_mhz: 400         # shared by all services on this RAN
       telemetry: { interval_s: 2, throughput_mbps: 90, latency_ms: 8 }
 
   - name: ran-rural
@@ -53,33 +59,49 @@ domains:
       positioning: true
       core_links: { core-central: 15.0, core-edge: 6.0 }
     behavior:
-      max_bandwidth_mhz: 100
+      max_bandwidth_mhz: 200
       telemetry: { interval_s: 2, throughput_mbps: 60, latency_ms: 15 }
 
 intents:
-  # Natural language, translated by the (mock) LLM using `translations` below.
+  # 0: only ran-urban covers TA 1000 and only core-edge is within 5 ms -> ran-urban + core-edge.
   - at_s: 0
     owner: factory-operator
-    expression: Low-latency slice for robots in TA 1000 for 15 seconds, 100 MHz, latency under 10 ms.
+    expression: Low-latency slice for robots in TA 1000 for 20 seconds, 100 MHz, latency under 10 ms.
 
-  # Structured requests bypass the LLM.
+  # 1: no RAN in TA 2000 has 1000 MHz -> all 4 candidates reject -> REJECTED (with proposals).
   - at_s: 2
     owner: video-streaming
     rfs:
-      ran: { bandwidth_mhz: 1000, tac: 2000, duration_s: 15 }   # more than any RAN offers -> REJECTED
+      ran: { bandwidth_mhz: 1000, tac: 2000, duration_s: 15 }
       core: { priority: 3 }
 
+  # 2: fits on ran-urban + core-edge (core-edge is now full), but telemetry (90 Mbps) is below target -> SLA degraded.
   - at_s: 4
     owner: stadium-event
     rfs:
-      ran: { bandwidth_mhz: 200, throughput_mbps: 150, tac: 1000, duration_s: 15 }   # telemetry below target -> STATE_DEGRADES
+      ran: { bandwidth_mhz: 200, throughput_mbps: 150, tac: 1000, duration_s: 20 }
       core: { priority: 1, latency_ms: 20 }
 
-  - at_s: 6
+  # 3: ran-urban has only 100 MHz left, core-edge is full -> accepted on the 4th candidate: ran-suburban + core-central.
+  - at_s: 8
+    owner: campus-network
+    rfs:
+      ran: { bandwidth_mhz: 150, num_ues: 300, tac: 2000, duration_s: 15 }
+      core: { priority: 2 }
+
+  # 4: ran-rural (TA 3000) reaches only core-central over a 35 ms link -> no candidate within 20 ms -> REJECTED.
+  - at_s: 10
+    owner: agriculture
+    rfs:
+      ran: { bandwidth_mhz: 20, tac: 3000, duration_s: 15 }
+      core: { latency_ms: 20 }
+
+  # 5: the mock LLM does not know this sentence -> translation fails -> SUBMISSION_FAILED.
+  - at_s: 12
     owner: unknown-user
-    expression: Something the mock LLM does not know.   # translation fails -> SUBMISSION_FAILED
+    expression: Something the mock LLM does not know.
 
 translations:
-  "Low-latency slice for robots in TA 1000 for 15 seconds, 100 MHz, latency under 10 ms.":
-    ran: { bandwidth_mhz: 100, latency_ms: 10, tac: 1000, duration_s: 15 }
+  "Low-latency slice for robots in TA 1000 for 20 seconds, 100 MHz, latency under 10 ms.":
+    ran: { bandwidth_mhz: 100, latency_ms: 10, tac: 1000, duration_s: 20 }
     core: { priority: 1, latency_ms: 5 }

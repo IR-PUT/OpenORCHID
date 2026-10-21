@@ -1,8 +1,8 @@
-10:25:08 | #0 submitted: {'intent_owner': 'Anonymous', 'expression': 'Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.'} -> INT-FB7D5269
-10:25:14 | INT-FB7D5269 update: {'intent_id': 'INT-FB7D5269', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.'}
-10:25:19 | INT-FB7D5269 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-FB7D5269', 'current_handling_state': 'STATE_COMPLIES'}
-10:25:34 | INT-FB7D5269 update: {'intent_id': 'INT-FB7D5269', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
-10:25:34 | Scenario 'basic' finished after 27.5s
+10:42:22 | #0 submitted: {'intent_owner': 'Anonymous', 'expression': 'Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.'} -> INT-72A64ED6
+10:42:24 | INT-72A64ED6 update: {'intent_id': 'INT-72A64ED6', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-1', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+10:42:29 | INT-72A64ED6 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-72A64ED6', 'current_handling_state': 'STATE_COMPLIES'}
+10:42:44 | INT-72A64ED6 update: {'intent_id': 'INT-72A64ED6', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+10:42:45 | Scenario 'basic' finished after 27.9s
 Registered domains: ran-1, core-1
- #   at_s  intent_id     final state        SLA       last message
- 0    0.0  INT-FB7D5269  HANDLING_ENDED     -         Service lifecycle expired and resources released.
+ #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
+ 0    0.0  INT-72A64ED6  HANDLING_ENDED     ran-1+core-1                    1  -         Service lifecycle expired and resources released.

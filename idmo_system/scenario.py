@@ -32,6 +32,20 @@ class RuntimeConfig(_StrictModel):
     output_dir: str | None = "results" # Logs go to <output_dir>/<scenario name>/; None disables file logs
 
 
+class OrchestratorConfig(_StrictModel):
+    domain_selection: str = "first_available" # Strategy from core/domain_selection.py
+    max_candidates: int = Field(default=3, ge=1) # How many (RAN, CORE) pairs to try before rejecting
+    feasibility_timeout_s: float = 5.0 # A domain that does not answer in time counts as a rejection
+    seed: int | None = None # Seed for the "random" strategy
+
+    @model_validator(mode="after")
+    def _known_strategy(self):
+        from idmo_system.core.domain_selection import STRATEGIES
+        if self.domain_selection not in STRATEGIES:
+            raise ValueError(f"unknown domain_selection '{self.domain_selection}', available: {sorted(STRATEGIES)}")
+        return self
+
+
 class RegistryConfig(_StrictModel):
     heartbeat_interval_s: float = 10.0
     max_missed_heartbeats: int = 3
@@ -72,6 +86,7 @@ class Scenario(_StrictModel):
     description: str = ""
     runtime: RuntimeConfig = RuntimeConfig()
     registry: RegistryConfig = RegistryConfig()
+    orchestrator: OrchestratorConfig = OrchestratorConfig()
     domains: list[DomainConfig] = Field(min_length=1)
     intents: list[IntentConfig] = []
     translations: dict[str, ResourceFacingService] = {} # Mock LLM: expression -> RFS

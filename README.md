@@ -26,7 +26,8 @@ OpenORCHID is an event-driven orchestration system for managing multi-domain net
 | `idmo_system/communication/` | NATS↔Kafka bridge and shared message contracts |
 | `idmo_system/domains/` | Domain broker base + RAN/CORE-specific behavior |
 | `idmo_system/gateway/` | HTTP intent ingress and NL→RFS translation |
-| `idmo_system/mock_*.py` | In-process mocks for messaging and LLM, for local demos/tests |
+| `idmo_system/mocks/` | In-process mocks for Kafka, NATS and the LLM, for local demos/tests |
+| `idmo_system/scenario.py`, `runner.py` | Scenario files (YAML) and the runner that builds and drives the system |
 
 ## Getting Started
 
@@ -47,12 +48,25 @@ uv run python run_all.py
 At the end the runner prints a summary of every intent, e.g.:
 
 ```
- #   at_s  intent_id     final state        SLA       last message
- 0    0.0  INT-E9961BF2  HANDLING_ENDED     -         Service lifecycle expired and resources released.
- 1    2.0  INT-AECFC220  REJECTED           -         Feasibility check failed in at least one domain.
- 2    4.0  INT-1139EDE9  HANDLING_ENDED     degraded  Service lifecycle expired and resources released.
- 3    6.0  -             SUBMISSION_FAILED  -         HTTP 422: Translation Error: Translator returned no data for the given expression.
+ #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
+ 0    0.0  INT-741735FE  HANDLING_ENDED     ran-urban+core-edge             1  -         Service lifecycle expired and resources released.
+ 1    2.0  INT-651EA11F  REJECTED           -                               4  -         Feasibility check failed for all 4 candidate(s); last: ran-suburban: 1000 MHz requested, 200 MHz available.
+ 2    4.0  INT-B309317B  HANDLING_ENDED     ran-urban+core-edge             1  degraded  Service lifecycle expired and resources released.
+ 3    8.0  INT-35E514D4  HANDLING_ENDED     ran-suburban+core-central       4  -         Service lifecycle expired and resources released.
+ 4   10.0  INT-9441C816  REJECTED           -                               0  -         Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).
+ 5   12.0  -             SUBMISSION_FAILED  -                               0  -         HTTP 422: Translation Error: Translator returned no data for the given expression.
 ```
+
+### How domains are chosen
+
+1. **Filtering** (orchestrator, from registered capabilities): the domain is UP, the RAN covers the requested
+   TA (`rfs.ran.tac`), the RAN has a link to the CORE (`core_links`) and the link latency is within `rfs.core.latency_ms`.
+2. **Ranking** with the strategy set in `orchestrator.domain_selection`: `first_available`, `least_loaded`,
+   `lowest_latency` or `random`. Own strategies can be added with `@register_strategy("name")` in
+   `idmo_system/core/domain_selection.py`.
+3. **Feasibility with retries**: the saga asks the best (RAN, CORE) pair; each domain checks its *current* load
+   (RAN: bandwidth, UEs, coverage; CORE: number of services, UEs). If either rejects, the next pair is tried,
+   up to `orchestrator.max_candidates`. A rejected intent reports the reasons and what the domains could offer instead.
 
 A minimal scenario:
 
@@ -62,7 +76,8 @@ runtime: { duration_s: 60, transport: mock, llm: mock }   # transport: real / ll
 domains:
   - name: ran-1
     type: ran
-    capabilities: { maxNumberofUEs: 100, nROperatingBands: [n78], coverageAreaTAList: [[260, 1, 100]], positioning: true }
+    capabilities: { maxNumberofUEs: 100, nROperatingBands: [n78], coverageAreaTAList: [[260, 1, 100]], positioning: true,
+                    core_links: { core-1: 5.0 } }
     behavior: { max_bandwidth_mhz: 400, telemetry: { interval_s: 5, throughput_mbps: 80, latency_ms: 10 } }
   - name: core-1
     type: core

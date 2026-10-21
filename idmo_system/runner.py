@@ -53,6 +53,19 @@ class IntentResult:
     def is_terminal(self) -> bool:
         return self.error is not None or self.handling_state in TERMINAL_HANDLING_STATES
 
+    def _latest(self, key: str):
+        return next((h[key] for h in reversed(self.history) if key in h), None)
+
+    @property
+    def selected_domains(self) -> dict | None:
+        """RAN and CORE domain the service was provisioned on."""
+        return self._latest("selected_domains")
+
+    @property
+    def attempts(self) -> list[dict]:
+        """Feasibility attempts made by the orchestrator (one per tried RAN/CORE pair)."""
+        return self._latest("attempts") or []
+
     @property
     def sla_degraded(self) -> bool:
         """True if the SLA monitor reported degradation at any point of the service lifetime."""
@@ -82,11 +95,14 @@ class ScenarioResult:
         ]
         if self.missing_domains:
             lines.append(f"NOT registered: {', '.join(self.missing_domains)}")
-        lines.append(f"{'#':>2}  {'at_s':>5}  {'intent_id':<12}  {'final state':<17}  {'SLA':<8}  last message")
+        lines.append(f"{'#':>2}  {'at_s':>5}  {'intent_id':<12}  {'final state':<17}  {'domains (RAN+CORE)':<26}  "
+                     f"{'tries':>5}  {'SLA':<8}  last message")
         for r in self.intents:
-            last_message = r.error or next((h["message"] for h in reversed(r.history) if "message" in h), "")
+            last_message = r.error or r._latest("message") or ""
             sla = "degraded" if r.sla_degraded else "-"
-            lines.append(f"{r.index:>2}  {r.config.at_s:>5.1f}  {r.intent_id or '-':<12}  {r.final_state:<17}  {sla:<8}  {last_message}")
+            domains = f"{r.selected_domains['ran']}+{r.selected_domains['core']}" if r.selected_domains else "-"
+            lines.append(f"{r.index:>2}  {r.config.at_s:>5.1f}  {r.intent_id or '-':<12}  {r.final_state:<17}  {domains:<26}  "
+                         f"{len(r.attempts):>5}  {sla:<8}  {last_message}")
         return "\n".join(lines)
 
 
@@ -135,7 +151,7 @@ class ScenarioRunner:
             components = [
                 registry,
                 SLAMonitor(nats_url=rt.nats_url),
-                ServiceOrchestrator(nats_url=rt.nats_url),
+                ServiceOrchestrator(nats_url=rt.nats_url, **self.scenario.orchestrator.model_dump()),
             ]
             tasks += [asyncio.create_task(c.run()) for c in components]
             tasks.append(asyncio.create_task(MessageBusAdapter(kafka_bootstrap=rt.kafka_bootstrap, nats_url=rt.nats_url).start()))
@@ -198,11 +214,12 @@ class ScenarioRunner:
             self._close_log_files()
 
     async def _wait_for_registration(self, registry) -> list[str]:
-        """Waits until every scenario domain is in the registry; returns names that did not register in time."""
+        """Waits until every scenario domain is UP in the registry; returns names that did not get there in time."""
         expected = {d.name: registry._domain_id_from_name(d.name) for d in self.scenario.domains}
         deadline = time.monotonic() + self.scenario.runtime.registration_timeout_s
         while time.monotonic() < deadline:
-            missing = [name for name, domain_id in expected.items() if domain_id not in registry.domain_repository]
+            missing = [name for name, domain_id in expected.items()
+                       if registry.domain_repository.get(domain_id, {}).get("status") != "UP"]
             if not missing:
                 log.success(f"SCENARIO: All {len(expected)} domains registered.")
                 return []

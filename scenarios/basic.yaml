@@ -17,7 +17,7 @@ domains:
     capabilities:
       maxNumberofUEs: 100
       nROperatingBands: [n78, n258]
-      coverageAreaTAList: [[260, 1, 100]]   # (mcc, mnc, tac)
+      coverageAreaTAList: [[260, 1, 1000]]  # (mcc, mnc, tac)
       positioning: true
       core_links: { core-1: 10.0 }          # CORE domain -> link latency [ms]
     behavior:

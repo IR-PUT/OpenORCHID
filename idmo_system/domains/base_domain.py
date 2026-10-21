@@ -1,8 +1,17 @@
 import json
 import asyncio
 import uuid
+from dataclasses import dataclass
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from loguru import logger as log
+
+
+@dataclass
+class FeasibilityResult:
+    ok: bool
+    proposals: dict | None = None # What the domain could offer instead, e.g. {"bandwidth_mhz": 100}
+    reason: str | None = None # Why the request was rejected
+
 
 class BaseDomainBroker:
     def __init__(self, domain_type, capabilities: dict, domain_name=None, kafka_bootstrap="localhost:9092"):
@@ -16,6 +25,7 @@ class BaseDomainBroker:
         self._topic_idmo_to_domain = None
         self._topic_domain_to_idmo = None
         self._service_listeners = {}
+        self._reservations = {} # intent_id -> {resource: amount}, released on termination
         
         self._temporary_domain_id = f"temp_{domain_type}_{uuid.uuid4().hex[:6]}"
         self.producer = None
@@ -143,13 +153,17 @@ class BaseDomainBroker:
             await self._process_provisioning(raw_message, service_topic)
 
     async def _process_feasibility(self, data):
-        result, proposals = await self.handle_feasibility(data)
+        result = await self.handle_feasibility(data)
+        if not result.ok:
+            log.warning(f"Domain {self._domain_unique_id}: Rejecting {data.get('intent_id')} - {result.reason}")
         response = {
             "message_type": "FeasibilityCheckResponse",
             "intent_id": data.get("intent_id"),
+            "attempt": data.get("attempt", 0),
             "domain_type": self._domain_type,
-            "status": result,
-            "proposals": proposals,
+            "status": result.ok,
+            "proposals": result.proposals,
+            "reason": result.reason,
             "source_module": self._domain_unique_id,
             "target_module": "IDMO"
         }
@@ -217,6 +231,7 @@ class BaseDomainBroker:
         intent_id = data.get("intent_id")
           
         log.warning(f"Domain {self._domain_unique_id}: Terminating service {intent_id}...")
+        self.release(intent_id)
         
         termination_report = {
             "message_type": "ServiceChangeStatus",
@@ -233,5 +248,23 @@ class BaseDomainBroker:
         )
         log.success(f"Termination confirmed for {intent_id}. Sending DEACTIVATED status.")
 
-    async def handle_feasibility(self, data): raise NotImplementedError
-    async def handle_provisioning(self, data): raise NotImplementedError
+    # --- Resource accounting -------------------------------------------------------------------
+
+    def reserve(self, intent_id: str, **amounts: float):
+        self._reservations[intent_id] = amounts
+
+    def release(self, intent_id: str):
+        self._reservations.pop(intent_id, None)
+
+    def reserved(self, resource: str) -> float:
+        """Sum of a resource reserved by all active services."""
+        return sum(r.get(resource, 0) for r in self._reservations.values())
+
+    @property
+    def active_services(self) -> int:
+        return len(self._reservations)
+
+    # --- Domain specific logic ------------------------------------------------------------------
+
+    async def handle_feasibility(self, data) -> FeasibilityResult: raise NotImplementedError
+    async def handle_provisioning(self, data) -> str: raise NotImplementedError # Returns a resource id

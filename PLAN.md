@@ -77,12 +77,20 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - [x] Scenarios: `basic.yaml`, `multi_domain.yaml`.
 - Events (fault injection) moved to Stage 3, where the behaviours they trigger are implemented.
 
-### Stage 2 — capability-driven decisions
-- Domain-side feasibility from capabilities + current load (reserve on provisioning, release on termination);
-  rejection returns `proposals`.
-- Orchestrator: pluggable selection strategy (`first_available`, `least_loaded`, `lowest_latency`, `random`).
-  Candidates filtered by TA coverage / bands / RAN↔CORE link, then ranked.
-- **Retry with next candidate** pair on feasibility rejection (bounded by `max_candidates`), recorded in the saga history.
+### Stage 2 — capability-driven decisions · branch `refactoring-step-2`
+- [x] Domain-side feasibility from capabilities + current load (reserve on provisioning, release on termination);
+      RAN: TA coverage, `max_bandwidth_mhz`, `maxNumberofUEs`; CORE: `max_services`, `maxNumberofUEs`.
+      Rejection returns `reason` + `proposals` (`FeasibilityResult` in `base_domain.py`).
+- [x] Orchestrator: pluggable selection strategy (`core/domain_selection.py`, `@register_strategy`):
+      `first_available`, `least_loaded`, `lowest_latency`, `random` (seeded). Candidates filtered by status UP,
+      TA coverage, RAN↔CORE link and link latency (`rfs_core.latency_ms`), then ranked. Bands skipped (no band in RFS).
+- [x] **Retry with next candidate** pair on feasibility rejection (bounded by `max_candidates`); `attempt` number
+      echoed by domains (stale answers ignored), feasibility timeout counts as rejection; attempts in status updates + summary.
+- [x] Registry: domain is `PENDING` until its first heartbeat (fixes requests sent to not-yet-listening domains);
+      capabilities served as JSON (were a Python repr string).
+- [x] `multi_domain.yaml` rewritten so each mechanism shows in the result.
+- Known limitation: resources are reserved at provisioning, not at feasibility — two sagas checking the same
+  domain at the same moment may overbook it.
 
 ### Stage 3 — behaviours and results
 - Telemetry profiles (`constant`, `random`, `degrading`), fault injection (`stop_heartbeat`, `crash`, `degrade`).

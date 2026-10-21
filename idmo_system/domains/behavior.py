@@ -14,9 +14,11 @@ class TelemetryConfig(BaseModel):
 class RanBehavior(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    max_bandwidth_mhz: float = 4000.0 # Largest bandwidth accepted in a feasibility check
+    max_bandwidth_mhz: float = 4000.0 # Total bandwidth capacity, shared by all active services
     telemetry: TelemetryConfig = TelemetryConfig()
 
 
 class CoreBehavior(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    max_services: int | None = None # Max number of concurrent services, None = unlimited

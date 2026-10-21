@@ -66,8 +66,9 @@ class DomainCapabilityRegistration:
                 "domain_id": domain_id,
                 "domain_name": request.domain_name,
                 "type": request.domain_type,
-                "capabilities": request.capabilities,
-                "status": "UP",
+                "capabilities": request.capabilities.model_dump(),
+                # UP only after the first heartbeat - until then the domain may not be able to receive requests yet.
+                "status": "PENDING",
                 "last_heartbeat": time.time(), # Initial timestamp
                 "source_module": request.source_module
             }
@@ -105,8 +106,9 @@ class DomainCapabilityRegistration:
 
             if domain_id in self.domain_repository:
                 self.domain_repository[domain_id]["last_heartbeat"] = time.time()
-                if self.domain_repository[domain_id]["status"] == "DOWN":
-                    log.info(f"Domain {domain_id} is back UP.")
+                previous_status = self.domain_repository[domain_id]["status"]
+                if previous_status != "UP":
+                    log.info(f"Domain {domain_id} is {'back ' if previous_status == 'DOWN' else ''}UP.")
                     self.domain_repository[domain_id]["status"] = "UP"
             else:
                 log.warning(f"Heartbeat from unknown domain: {domain_id}")

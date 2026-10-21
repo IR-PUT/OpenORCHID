@@ -56,7 +56,7 @@ class CoreRFS(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     priority: int | None = None
-    latency_ms: float | None = None
+    latency_ms: float | None = None # Max RAN <-> CORE link latency
 
 
 class ResourceFacingService(BaseModel):

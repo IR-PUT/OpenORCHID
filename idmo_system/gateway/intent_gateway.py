@@ -162,6 +162,9 @@ async def listen_for_intent_updates(app: FastAPI):
                     "last_message": data.get("message", "No extra info"),
                     "updated_at": _now()
                 })
+                for key in ("selected_domains", "attempts", "proposals"):
+                    if key in data:
+                        isr[intent_id][key] = data[key]
 
                 log.info(f"ISR: Intent {intent_id} transitioned to state: {new_lifecycle} and {new_handling}")
 

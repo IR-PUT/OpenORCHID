@@ -1,25 +1,39 @@
 import json
+import random
 import asyncio
+from functools import partial
+
 import nats
 from loguru import logger as log
+
+from idmo_system.core.domain_selection import select_candidates
 
 DEFAULT_SERVICE_DURATION_S = 60.0
 
 
 class ServiceSaga:
     """Represents the lifecycle of a single Service Intent (Saga Instance)"""
-    def __init__(self, intent_id, rfs_ran, rfs_core, nats_client):
+    def __init__(self, intent_id, rfs_ran, rfs_core, nats_client, select_candidates,
+                 max_candidates=3, feasibility_timeout_s=5.0):
         self.intent_id = intent_id
         self.rfs_ran = rfs_ran
         self.rfs_core = rfs_core
         self.nc = nats_client
-        self.state = "PREPARATION" 
+        self.state = "PREPARATION"
         self.feasibility_results = {"ran": None, "core": None}
         self.provisioning_results = {"ran": None, "core": None}
         self.termination_results = {"ran": None, "core": None}
-        self.selected_domains = {} 
+        self.selected_domains = {}
         self.service_topic = None # Initialized during provision_service
         self.duration = rfs_ran.get("duration_s") or DEFAULT_SERVICE_DURATION_S
+
+        # Preparation phase: ranked (RAN, CORE) candidates tried one after another.
+        self._select_candidates = select_candidates # (domains, rfs_ran, rfs_core) -> list[Candidate]
+        self.max_candidates = max_candidates
+        self.feasibility_timeout_s = feasibility_timeout_s
+        self.candidates = []
+        self.attempt = 0
+        self.attempts = [] # History: one entry per tried candidate
 
         self.fault_count = 0
         self.MAX_FAULT_THRESHOLD = 3
@@ -33,42 +47,58 @@ class ServiceSaga:
         await self.run_feasibility_check()
 
     async def run_feasibility_check(self):
-        """Step 1: Preparation Phase. Query Registry, then Query Domains."""
+        """Step 1: Preparation Phase. Query Registry, rank candidate domains, then query them one by one."""
         try:
             # 1. Query Registry for available domains
             log.info(f"Saga-{self.intent_id}: Querying Domain Registry...")
             inventory = await self._query_inventory_with_retry()
             domains = inventory.get("domains", {})
 
-            # 2. Select domains (First Available Logic)
-            target_ran = next((id for id, d in domains.items() if d['type'] == 'ran' and d['status'] == 'UP'), None)
-            target_core = next((id for id, d in domains.items() if d['type'] == 'core' and d['status'] == 'UP'), None)
+            # 2. Filter and rank (RAN, CORE) pairs
+            self.candidates = self._select_candidates(domains, self.rfs_ran, self.rfs_core)[:self.max_candidates]
+            if not self.candidates:
+                raise Exception("No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).")
 
-            if not target_ran or not target_core:
-                raise Exception("Required domains (RAN/CORE) not found or offline.")
+            log.info(f"Saga-{self.intent_id}: Candidates -> "
+                     + ", ".join(f"{c.ran}+{c.core}" for c in self.candidates))
 
-            self.selected_domains = {"ran": target_ran, "core": target_core}
-            log.info(f"Saga-{self.intent_id}: Targets selected -> RAN: {target_ran}, CORE: {target_core}")
-
-            # 3. Publish Feasibility Check Request
-            check_event = {
-                "message_type": "FeasibilityCheckRequest",
-                "intent_id": self.intent_id,
-                "target_domains": self.selected_domains,
-                "rfs_ran": self.rfs_ran,
-                "rfs_core": self.rfs_core
-            }
-            # Note: Adapter must listen to "feasibility.check.request"
-            await self.nc.publish("feasibility.check.request", json.dumps(check_event).encode())
+            # 3. Ask the first candidate
+            await self._request_feasibility()
 
         except Exception as e:
             log.error(f"Saga-{self.intent_id}: Preparation failed: {e}")
-            self.state = "REJECTED"
-            await self.nc.publish("intent.status.update", json.dumps({
-                "intent_id": self.intent_id,
-                "current_handling_state": "REJECTED",
-                "message": f"Orchestration error: {str(e)}"
-            }).encode())
+            await self._reject(f"Orchestration error: {str(e)}")
+
+    async def _request_feasibility(self):
+        candidate = self.candidates[self.attempt]
+        self.selected_domains = {"ran": candidate.ran, "core": candidate.core}
+        self.feasibility_results = {"ran": None, "core": None}
+        log.info(f"Saga-{self.intent_id}: Attempt {self.attempt + 1}/{len(self.candidates)} "
+                 f"-> RAN: {candidate.ran}, CORE: {candidate.core}")
+
+        check_event = {
+            "message_type": "FeasibilityCheckRequest",
+            "intent_id": self.intent_id,
+            "attempt": self.attempt, # Echoed back by domains, so late answers to older attempts are ignored
+            "target_domains": self.selected_domains,
+            "rfs_ran": self.rfs_ran,
+            "rfs_core": self.rfs_core
+        }
+        # Note: Adapter must listen to "feasibility.check.request"
+        await self.nc.publish("feasibility.check.request", json.dumps(check_event).encode())
+        asyncio.create_task(self._feasibility_timeout(self.attempt))
+
+    async def _feasibility_timeout(self, attempt):
+        await asyncio.sleep(self.feasibility_timeout_s)
+        if self.state != "PREPARATION" or self.attempt != attempt:
+            return
+        for domain_type, result in self.feasibility_results.items():
+            if result is None:
+                log.warning(f"Saga-{self.intent_id}: No feasibility answer from {self.selected_domains[domain_type]}.")
+                self.feasibility_results[domain_type] = {
+                    "status": False, "alternatives": None, "reason": "no response (timeout)"
+                }
+        await self.evaluate_preparation()
 
     async def _query_inventory_with_retry(self):
         """Retry inventory request to reduce startup race with registry/domain registration."""
@@ -100,11 +130,16 @@ class ServiceSaga:
 
         raise Exception("Domain inventory is empty after retries.")
 
-    async def on_feasibility_response(self, domain_type, is_possible, alternative_params=None):
+    async def on_feasibility_response(self, domain_type, attempt, is_possible, alternative_params=None, reason=None):
         """Handle response from Domain Brokers via Adapter"""
+        if self.state != "PREPARATION" or attempt != self.attempt:
+            log.debug(f"Saga-{self.intent_id}: Ignoring feasibility answer for attempt {attempt}.")
+            return
+
         self.feasibility_results[domain_type] = {
-            "status": is_possible, 
-            "alternatives": alternative_params
+            "status": is_possible,
+            "alternatives": alternative_params,
+            "reason": reason
         }
 
         # Check if both domains responded
@@ -112,26 +147,48 @@ class ServiceSaga:
             await self.evaluate_preparation()
 
     async def evaluate_preparation(self):
-        ran_ok = self.feasibility_results["ran"]["status"]
-        core_ok = self.feasibility_results["core"]["status"]
+        ran_result = self.feasibility_results["ran"]
+        core_result = self.feasibility_results["core"]
+        self.attempts.append({
+            "ran": self.selected_domains["ran"],
+            "core": self.selected_domains["core"],
+            "ran_ok": ran_result["status"],
+            "core_ok": core_result["status"],
+            "reasons": {k: v["reason"] for k, v in self.feasibility_results.items() if not v["status"]},
+            "proposals": {k: v["alternatives"] for k, v in self.feasibility_results.items() if v["alternatives"]},
+        })
 
-        if ran_ok and core_ok:
+        if ran_result["status"] and core_result["status"]:
             log.success(f"Saga-{self.intent_id}: Feasibility OK. Moving to COMMISSIONING.")
             self.state = "COMMISSIONING"
             await self.provision_service()
-        else:
-            log.warning(f"Saga-{self.intent_id}: Feasibility FAILED. Notifying Gateway.")
-            self.state = "REJECTED"
-            report = {
+            return
+
+        rejected_by = ", ".join(f"{self.selected_domains[k]}: {v}" for k, v in self.attempts[-1]["reasons"].items())
+        self.attempt += 1
+
+        if self.attempt < len(self.candidates):
+            log.warning(f"Saga-{self.intent_id}: Candidate rejected ({rejected_by}). Trying the next one.")
+            await self.nc.publish("intent.status.update", json.dumps({
                 "intent_id": self.intent_id,
-                "current_handling_state": "REJECTED",
-                "message": "Feasibility check failed in at least one domain.",
-                "proposals": {
-                    "ran": self.feasibility_results["ran"].get("alternatives"),
-                    "core": self.feasibility_results["core"].get("alternatives")
-                }
-            }
-            await self.nc.publish("intent.status.update", json.dumps(report).encode())
+                "message": f"Attempt {self.attempt}/{len(self.candidates)} rejected ({rejected_by}), trying next candidate.",
+                "attempts": self.attempts
+            }).encode())
+            await self._request_feasibility()
+        else:
+            log.warning(f"Saga-{self.intent_id}: Feasibility FAILED for all {len(self.candidates)} candidates. Notifying Gateway.")
+            await self._reject(f"Feasibility check failed for all {len(self.candidates)} candidate(s); last: {rejected_by}.")
+
+    async def _reject(self, message):
+        self.state = "REJECTED"
+        await self.nc.publish("intent.status.update", json.dumps({
+            "intent_id": self.intent_id,
+            "current_handling_state": "REJECTED",
+            "message": message,
+            "attempts": self.attempts,
+            # Proposals from the last attempt, e.g. the bandwidth a RAN could still offer
+            "proposals": self.attempts[-1]["proposals"] if self.attempts else {}
+        }).encode())
 
     async def provision_service(self):
         """Step 2: Technical creation (Commissioning Phase)"""
@@ -186,10 +243,15 @@ class ServiceSaga:
         log.critical(f"Saga {self.intent_id}: SLS threshold exceeded consistently. Triggering RECOVERY!")
 
 class ServiceOrchestrator:
-    def __init__(self, nats_url="nats://localhost:4222"):
+    def __init__(self, nats_url="nats://localhost:4222", domain_selection="first_available",
+                 max_candidates=3, feasibility_timeout_s=5.0, seed=None):
         self.nats_url = nats_url
         self.nc = None
         self.active_sagas = {}
+        self.domain_selection = domain_selection
+        self.max_candidates = max_candidates
+        self.feasibility_timeout_s = feasibility_timeout_s
+        self._rng = random.Random(seed)
 
     async def connect(self):
         self.nc = await nats.connect(self.nats_url)
@@ -205,10 +267,25 @@ class ServiceOrchestrator:
     async def handle_new_order(self, msg):
         data = json.loads(msg.data.decode())
         intent_id = data["intent_id"]
-        saga = ServiceSaga(intent_id, data["rfs_ran"], data["rfs_core"], self.nc)
+        saga = ServiceSaga(
+            intent_id, data["rfs_ran"], data["rfs_core"], self.nc,
+            select_candidates=partial(select_candidates, strategy=self.domain_selection,
+                                      load=self._domain_load(), rng=self._rng),
+            max_candidates=self.max_candidates,
+            feasibility_timeout_s=self.feasibility_timeout_s,
+        )
         self.active_sagas[intent_id] = saga
         await saga.start()
         self._drop_if_rejected(saga)
+
+    def _domain_load(self) -> dict[str, int]:
+        """Number of services each domain currently handles (sagas past the preparation phase)."""
+        load = {}
+        for saga in self.active_sagas.values():
+            if saga.state in ("COMMISSIONING", "OPERATION", "DECOMMISSIONING"):
+                for domain_id in saga.selected_domains.values():
+                    load[domain_id] = load.get(domain_id, 0) + 1
+        return load
 
     def _drop_if_rejected(self, saga):
         if saga.state == "REJECTED":
@@ -224,8 +301,10 @@ class ServiceOrchestrator:
             saga = self.active_sagas[intent_id]
             await saga.on_feasibility_response(
                 domain_type=domain_type,
+                attempt=data.get("attempt", 0),
                 is_possible=data["status"],
-                alternative_params=data.get("proposals")
+                alternative_params=data.get("proposals"),
+                reason=data.get("reason")
             )
             self._drop_if_rejected(saga)
 
@@ -259,7 +338,9 @@ class ServiceOrchestrator:
                     final_report = {
                         "intent_id": intent_id,
                         "lifecycle_status": "ACTIVE",
-                        "message": "Service is fully operational."
+                        "message": "Service is fully operational.",
+                        "selected_domains": saga.selected_domains,
+                        "attempts": saga.attempts
                     }
                     asyncio.create_task(saga.start_lifecycle_timer())
                     await self.nc.publish("intent.status.update", json.dumps(final_report).encode())
