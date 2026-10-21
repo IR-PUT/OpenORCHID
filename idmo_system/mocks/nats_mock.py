@@ -160,34 +160,29 @@ class MockNATSClient:
             i += 1
 
         return i == len(pub_tokens)
-        
 
 
-# ==========================================
-# 2. MONKEY PATCHING DLA STRUCTURY nats.aio.client
-# ==========================================
-
-# Tworzymy poszczególne poziomy drzewa modułów
-mock_nats = types.ModuleType('nats')
-mock_nats_aio = types.ModuleType('nats.aio')
-mock_nats_aio_client = types.ModuleType('nats.aio.client')
-
-# # Przypisujemy naszą klasę MockNATSClient pod nazwę 'Client'
-mock_nats_aio_client.Client = MockNATSClient
-
-# # Łączymy referencje hierarchicznie, aby działała nawigacja po kropkach
-mock_nats_aio.client = mock_nats_aio_client
-mock_nats.aio = mock_nats_aio
-
-async def global_connect(servers, **kwargs):
+async def _mock_connect(servers, **kwargs):
     client = MockNATSClient()
     await client.connect(servers)
     return client
 
-mock_nats.connect = global_connect
-mock_nats.NATS = MockNATSClient
 
-# # Wstrzykujemy każdy poziom do globalnej pamięci podręcznej Pythona
-sys.modules['nats'] = mock_nats
-sys.modules['nats.aio'] = mock_nats_aio
-sys.modules['nats.aio.client'] = mock_nats_aio_client
+def install():
+    """Replace the nats modules in sys.modules with in-process mocks.
+
+    Must be called before any module that imports nats is imported.
+    """
+    mock_nats = types.ModuleType('nats')
+    mock_nats_aio = types.ModuleType('nats.aio')
+    mock_nats_aio_client = types.ModuleType('nats.aio.client')
+
+    mock_nats_aio_client.Client = MockNATSClient
+    mock_nats_aio.client = mock_nats_aio_client
+    mock_nats.aio = mock_nats_aio
+    mock_nats.connect = _mock_connect
+    mock_nats.NATS = MockNATSClient
+
+    sys.modules['nats'] = mock_nats
+    sys.modules['nats.aio'] = mock_nats_aio
+    sys.modules['nats.aio.client'] = mock_nats_aio_client

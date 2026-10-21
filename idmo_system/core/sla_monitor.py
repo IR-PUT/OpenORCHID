@@ -9,7 +9,7 @@ class SLAMonitor:
         self.nats_url = nats_url
         self.nc = NATS()
         
-        # {intent_id: rfs_ran_dict}
+        # {intent_id: RanRFS dict}
         self.active_services = {}
         
         # {intent_id: deque([last_100_reports])}
@@ -84,16 +84,17 @@ class SLAMonitor:
         rfs = self.active_services[intent_id]
         violations = []
 
-        target_tp = rfs.get("throughput_mbps", 0)
-        target_lat = rfs.get("latency_target_ms", 100)
+        # RanRFS fields; None means the intent does not constrain that metric.
+        target_tp = rfs.get("throughput_mbps")
+        target_lat = rfs.get("latency_ms")
 
-        current_tp = metrics.get("throughput_mbps", 0)
-        current_lat = metrics.get("latency_ms", 0)
+        current_tp = metrics.get("throughput_mbps")
+        current_lat = metrics.get("latency_ms")
 
-        if current_tp < target_tp:
+        if target_tp is not None and current_tp is not None and current_tp < target_tp:
             violations.append(f"Throughput Violation: {current_tp}Mbps < {target_tp}Mbps")
 
-        if current_lat > target_lat:
+        if target_lat is not None and current_lat is not None and current_lat > target_lat:
             violations.append(f"Latency Violation: {current_lat}ms > {target_lat}ms")
 
         new_state = "STATE_DEGRADES" if violations else "STATE_COMPLIES"

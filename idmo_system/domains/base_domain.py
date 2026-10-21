@@ -5,8 +5,10 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from loguru import logger as log
 
 class BaseDomainBroker:
-    def __init__(self, domain_type, kafka_bootstrap="localhost:9092"):
+    def __init__(self, domain_type, domain_name=None, kafka_bootstrap="localhost:9092"):
         self._domain_type = domain_type
+        # Domain name must be unique - the registry derives the domain ID (and Kafka topics) from it.
+        self._domain_name = domain_name or f"{domain_type}-{uuid.uuid4().hex[:6]}"
         self.kafka_bootstrap = kafka_bootstrap
         
         self._domain_unique_id = None
@@ -25,12 +27,12 @@ class BaseDomainBroker:
         
         await asyncio.sleep(1.0) 
 
-        log.info(f'Sending registration request for {self._domain_type}...')
+        log.info(f'Sending registration request for {self._domain_name} ({self._domain_type})...')
         reg_msg = {
             "message_type": "DomainRegistrationRequest",
             "source_module": self._temporary_domain_id,
             "target_module": 'IDMO',
-            "domain_name": f"Domain_{self._domain_type}",
+            "domain_name": self._domain_name,
             "domain_type": self._domain_type,
             "capabilities": capabilities
         }
@@ -49,7 +51,7 @@ class BaseDomainBroker:
             "unity6g.domain.registration.response",
             bootstrap_servers=self.kafka_bootstrap,
             group_id=f"group_{self._temporary_domain_id}",
-            auto_offset_reset='earliest' # Gwarancja, że nie przegapimy odpowiedzi
+            auto_offset_reset='earliest' # Guarantees we do not miss the response
         )
         await consumer.start()
         try:

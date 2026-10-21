@@ -1,10 +1,13 @@
-import idmo_system.mock_kafka
-import idmo_system.mock_nats
-import idmo_system.mock_llm
+# In-process Kafka/NATS/LLM mocks - must be installed before modules using aiokafka/nats are imported.
+# Set USE_MOCKS = False to run against the infrastructure from docker-compose.yaml.
+USE_MOCKS = True
+
+if USE_MOCKS:
+    from idmo_system import mocks
+    mocks.install()
 
 import aiohttp
 import asyncio
-import json
 import logging
 import sys
 import uuid
@@ -27,6 +30,9 @@ NATS_LOG_FILE = Path("results") / "nats_all_subjects.log"
 KAFKA_LOG_FILE = Path("results") / "kafka_all_topics.log"
 USER_LOG_FILE = Path("results") / "user_intent.log"
 SHUTDOWN_AFTER_SECONDS = 60
+KAFKA_BOOTSTRAP = "localhost:9092"
+NATS_URL = "nats://localhost:4222"
+GATEWAY_PORT = 8000
 
 
 def disable_fastapi_logs():
@@ -97,30 +103,14 @@ user_file_logger = logger.bind(user_file_only=True)
 
 
 
-async def simulate_user_intent(nc):
-    """
-    Simulates the Intent Gateway receiving an intent and 
-    starting the chain reaction.
-    """
-    await asyncio.sleep(5) # Wait for registration to complete
-    
-    intent_payload = {
-        "intent_id": "INT-001",
-        "rfs_ran": {"bandwidth": 100, "latency": 10},
-        "rfs_core": {"latency": 15, "priority": 1}
-    }
-    
-    logger.info("USER: Sending new Service Order Request...")
-    await nc.publish("service.order.request", json.dumps(intent_payload).encode())
-
 async def simulate_user_intent_with_status_check():
     await asyncio.sleep(5)  # Wait for the system to be ready
     user_file_logger.info("Starting intent simulation with status polling...")
-    url = "http://localhost:8000/"
+    url = f"http://localhost:{GATEWAY_PORT}/"
 
     async with aiohttp.ClientSession() as session:
         data = {
-            "expression": "Set up a slice with core priority 2 and 50ms latency. RAN bandwidth must be 20."
+            "expression": "Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000."
         }
         user_file_logger.info(f"Submitting intent: {data}")
         async with session.post(url + "intents", json=data) as resp:
@@ -145,7 +135,7 @@ async def simulate_user_intent_with_status_check():
 async def monitor_system_events():
     """Subscribe to all NATS subjects and persist every message to file."""
     nc = NATS()
-    await nc.connect("nats://localhost:4222")
+    await nc.connect(NATS_URL)
     try:
         sub_all = await nc.subscribe(">")
 
@@ -193,7 +183,7 @@ async def cleanup_kafka(bootstrap_servers):
         if to_delete:
             logger.warning(f"SYSTEM: Cleaning up old topics: {to_delete}")
             await admin.delete_topics(to_delete)
-            # Kafka potrzebuje chwili na fizyczne usunięcie plików
+            # Kafka needs a moment to physically delete the files
             await asyncio.sleep(2) 
     except Exception as e:
         logger.error(f"SYSTEM: Cleanup failed: {e}")
@@ -204,13 +194,13 @@ async def main():
     configure_loggers()
     disable_fastapi_logs()
 
-    bootstrap = "localhost:9092"
+    bootstrap = KAFKA_BOOTSTRAP
 
     await cleanup_kafka(bootstrap)
 
-    registry = DomainCapabilityRegistration()
-    sla_monitor = SLAMonitor()
-    adapter = MessageBusAdapter(kafka_bootstrap=bootstrap)
+    registry = DomainCapabilityRegistration(nats_url=NATS_URL)
+    sla_monitor = SLAMonitor(nats_url=NATS_URL)
+    adapter = MessageBusAdapter(kafka_bootstrap=bootstrap, nats_url=NATS_URL)
 
     reg_task = asyncio.create_task(registry.run())
     sm_task = asyncio.create_task(sla_monitor.run())
@@ -219,9 +209,9 @@ async def main():
     logger.info("SYSTEM: Waiting for registry startup...")
     # await asyncio.sleep(5) 
 
-    orchestrator = ServiceOrchestrator()
-    ran_domain = RANDomainBroker(kafka_bootstrap=bootstrap)
-    core_domain = CoreDomainBroker(kafka_bootstrap=bootstrap)
+    orchestrator = ServiceOrchestrator(nats_url=NATS_URL)
+    ran_domain = RANDomainBroker(domain_name="ran-1", kafka_bootstrap=bootstrap)
+    core_domain = CoreDomainBroker(domain_name="core-1", kafka_bootstrap=bootstrap)
 
     ran_task = asyncio.create_task(ran_domain.start())
     core_task = asyncio.create_task(core_domain.start())
@@ -229,7 +219,7 @@ async def main():
     logger.info("SYSTEM: Domains sent requests. Waiting for Registry to create their topics...")
     # await asyncio.sleep(5) 
     intent_gateway = asyncio.create_task(
-        run_gateway_server(host="0.0.0.0", port=8000, log_level="critical")
+        run_gateway_server(host="0.0.0.0", port=GATEWAY_PORT, log_level="critical", nats_url=NATS_URL)
     )
 
     logger.info("SYSTEM: Everything ready. Starting intent simulation.")

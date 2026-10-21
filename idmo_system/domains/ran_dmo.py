@@ -2,18 +2,16 @@ import asyncio
 import json
 
 from idmo_system.domains.base_domain import BaseDomainBroker
-
-from idmo_system.domains.base_domain import BaseDomainBroker
 from loguru import logger
 
 class RANDomainBroker(BaseDomainBroker):
-    def __init__(self, kafka_bootstrap="localhost:9092"):
-        super().__init__(domain_type="ran", kafka_bootstrap=kafka_bootstrap)
+    def __init__(self, domain_name=None, kafka_bootstrap="localhost:9092"):
+        super().__init__(domain_type="ran", domain_name=domain_name, kafka_bootstrap=kafka_bootstrap)
         self._telemetry_tasks = {}
 
     async def start(self):
         """
-        Inicjalizuje brokera z danymi zgodnymi z modelem UnityRanCapabilities.
+        Registers the broker with capabilities matching the UnityRanCapabilities model.
         """
         ran_caps = {
             "maxNumberofUEs": 100,
@@ -27,9 +25,9 @@ class RANDomainBroker(BaseDomainBroker):
         await self.run(capabilities=ran_caps)
 
     async def handle_feasibility(self, data):
-        requested_bw = data.get("rfs_ran", {}).get("bandwidth", 0)
+        requested_bw = data.get("rfs_ran", {}).get("bandwidth_mhz") or 0
         is_ok = requested_bw <= 4000
-        proposals = None if is_ok else {"bandwidth": 4000}
+        proposals = None if is_ok else {"bandwidth_mhz": 4000}
         return is_ok, proposals
 
     async def handle_provisioning(self, data):

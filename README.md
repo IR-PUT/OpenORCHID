@@ -31,11 +31,13 @@ OpenORCHID is an event-driven orchestration system for managing multi-domain net
 ## Getting Started
 
 ```bash
-# Bring up infrastructure (Kafka, NATS, Ollama, Kafka UI)
-docker compose up -d
+# Run the full demo (startup, simulation, event monitoring).
+# By default it uses in-process mocks of Kafka, NATS and the LLM - no infrastructure needed.
+uv run python run_all.py
 
-# Run the full demo (startup, simulation, event monitoring)
-python run_all.py
+# To run against real infrastructure (Kafka, NATS, Ollama, Kafka UI),
+# set USE_MOCKS = False in run_all.py and bring up the services first:
+docker compose up -d
 ```
 
 Runtime traces and monitoring output are written to `logs/` and `results/`. API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).

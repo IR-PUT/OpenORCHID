@@ -3,6 +3,9 @@ import asyncio
 import nats
 from loguru import logger as log
 
+DEFAULT_SERVICE_DURATION_S = 60.0
+
+
 class ServiceSaga:
     """Represents the lifecycle of a single Service Intent (Saga Instance)"""
     def __init__(self, intent_id, rfs_ran, rfs_core, nats_client):
@@ -16,7 +19,7 @@ class ServiceSaga:
         self.termination_results = {"ran": None, "core": None}
         self.selected_domains = {} 
         self.service_topic = None # Initialized during provision_service
-        self.duration = rfs_ran.get("duration_s", 60)
+        self.duration = rfs_ran.get("duration_s") or DEFAULT_SERVICE_DURATION_S
 
         self.fault_count = 0
         self.MAX_FAULT_THRESHOLD = 3
@@ -60,7 +63,8 @@ class ServiceSaga:
 
         except Exception as e:
             log.error(f"Saga-{self.intent_id}: Preparation failed: {e}")
-            await self.nc.publish("feasibility.check.status", json.dumps({
+            self.state = "REJECTED"
+            await self.nc.publish("intent.status.update", json.dumps({
                 "intent_id": self.intent_id,
                 "current_handling_state": "REJECTED",
                 "message": f"Orchestration error: {str(e)}"
@@ -117,9 +121,11 @@ class ServiceSaga:
             await self.provision_service()
         else:
             log.warning(f"Saga-{self.intent_id}: Feasibility FAILED. Notifying Gateway.")
+            self.state = "REJECTED"
             report = {
                 "intent_id": self.intent_id,
                 "current_handling_state": "REJECTED",
+                "message": "Feasibility check failed in at least one domain.",
                 "proposals": {
                     "ran": self.feasibility_results["ran"].get("alternatives"),
                     "core": self.feasibility_results["core"].get("alternatives")
@@ -180,12 +186,13 @@ class ServiceSaga:
         log.critical(f"Saga {self.intent_id}: SLS threshold exceeded consistently. Triggering RECOVERY!")
 
 class ServiceOrchestrator:
-    def __init__(self):
+    def __init__(self, nats_url="nats://localhost:4222"):
+        self.nats_url = nats_url
         self.nc = None
         self.active_sagas = {}
 
     async def connect(self):
-        self.nc = await nats.connect("nats://localhost:4222")
+        self.nc = await nats.connect(self.nats_url)
         
         await self.nc.subscribe("service.order.request", cb=self.handle_new_order)       
         await self.nc.subscribe("feasibility.check.response", cb=self.handle_domain_feedback)
@@ -201,6 +208,11 @@ class ServiceOrchestrator:
         saga = ServiceSaga(intent_id, data["rfs_ran"], data["rfs_core"], self.nc)
         self.active_sagas[intent_id] = saga
         await saga.start()
+        self._drop_if_rejected(saga)
+
+    def _drop_if_rejected(self, saga):
+        if saga.state == "REJECTED":
+            self.active_sagas.pop(saga.intent_id, None)
 
     async def handle_domain_feedback(self, msg):
         """Routes feedback to the correct Saga instance"""
@@ -209,11 +221,13 @@ class ServiceOrchestrator:
         domain_type = data.get("domain_type") 
         
         if intent_id in self.active_sagas:
-            await self.active_sagas[intent_id].on_feasibility_response(
+            saga = self.active_sagas[intent_id]
+            await saga.on_feasibility_response(
                 domain_type=domain_type,
                 is_possible=data["status"],
                 alternative_params=data.get("proposals")
             )
+            self._drop_if_rejected(saga)
 
     async def handle_status_changed(self, msg):
         """Finalizes the Saga and updates Gateway"""
@@ -270,14 +284,14 @@ class ServiceOrchestrator:
                     del self.active_sagas[intent_id]
 
                     cleanup_request = {
-                        "topics": [f"unity6g.service.{intent_id}"]
+                        "topics": [saga.service_topic]
                     }
                     await self.nc.publish("clean.topics", json.dumps(cleanup_request).encode())
                     await self.nc.publish("intent.status.update", json.dumps(final_report).encode())
   
 
     async def handle_domain_lost(self, msg):
-        """Reaguje na DomainHeartbeatLost z Registry."""
+        """Reacts to DomainHeartbeatLost from the Registry."""
         data = json.loads(msg.data.decode())
         lost_domain_id = data.get("domain_id")
         
@@ -294,7 +308,9 @@ class ServiceOrchestrator:
     async def _handle_service_recovery(self, intent_id, lost_domain_id):
         log.critical(f"Saga-{intent_id}: Service interrupted by loss of domain {lost_domain_id}!")
         
-        # TODO: 
+        # TODO: recovery (re-provisioning on another domain) is not implemented yet.
+        await self.nc.publish("monitor.service.stop", json.dumps({"intent_id": intent_id}).encode())
+
         report = {
             "intent_id": intent_id,
             "current_handling_state": "HANDLING_ENDED",  

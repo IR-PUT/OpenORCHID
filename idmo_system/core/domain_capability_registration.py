@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import asyncio
 import nats
@@ -10,7 +11,8 @@ from idmo_system.communication.api import (
 )
 
 class DomainCapabilityRegistration:
-    def __init__(self, heartbeat_interval_s=10.0, max_missed_heartbeats=3):
+    def __init__(self, nats_url="nats://localhost:4222", heartbeat_interval_s=10.0, max_missed_heartbeats=3):
+        self.nats_url = nats_url
         self.nc = None
         self.domain_repository = {} 
         self._heartbeat_interval_s = heartbeat_interval_s
@@ -20,7 +22,7 @@ class DomainCapabilityRegistration:
 
     async def connect(self):
         """Connect to NATS and subscribe to Registration and Heartbeat events."""
-        self.nc = await nats.connect("nats://localhost:4222")
+        self.nc = await nats.connect(self.nats_url)
 
         
         await self.nc.subscribe("domain.registration.request", cb=self.handle_registration)
@@ -45,15 +47,24 @@ class DomainCapabilityRegistration:
         """Handles DomainRegistrationRequest and initializes the heartbeat timer."""
         try:
             request = DomainRegistrationRequest.model_validate_json(msg.data)
-            
-            
-            domain_type_str = request.domain_type.value
-            existing_count = sum(1 for d in self.domain_repository.values() if d['type'] == request.domain_type)
-            domain_id = f"domain_{domain_type_str}_{existing_count + 1}"
+
+            domain_id = self._domain_id_from_name(request.domain_name)
+
+            if domain_id in self.domain_repository:
+                log.error(f"Registration rejected: domain {domain_id} is already registered.")
+                response = DomainRegistrationResponse(
+                    source_module="IDMO_REGISTRY",
+                    target_module=request.source_module,
+                    status=False,
+                    message=f"Domain name '{request.domain_name}' is already registered."
+                )
+                await self.nc.publish("domain.registration.ack", response.model_dump_json().encode())
+                return
 
             # Store in Repository with a timestamp
             self.domain_repository[domain_id] = {
                 "domain_id": domain_id,
+                "domain_name": request.domain_name,
                 "type": request.domain_type,
                 "capabilities": request.capabilities,
                 "status": "UP",
@@ -78,6 +89,11 @@ class DomainCapabilityRegistration:
 
         except Exception as e:
             log.error(f"Registration Error: {e}")
+
+    @staticmethod
+    def _domain_id_from_name(domain_name: str) -> str:
+        """Domain ID is used in Kafka topic names, so only [a-zA-Z0-9_-] characters are kept."""
+        return re.sub(r"[^a-zA-Z0-9_-]", "_", domain_name)
 
     async def handle_heartbeat(self, msg):
         """Processes DomainHealthMessage and updates 'last_heartbeat' timestamp."""

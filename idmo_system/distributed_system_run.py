@@ -31,8 +31,8 @@ async def main():
     adapter = MessageBusAdapter(kafka_bootstrap=bootstrap)
     orchestrator = ServiceOrchestrator()
 
-    ran_domain = RANDomainBroker(kafka_bootstrap=bootstrap)
-    core_domain = CoreDomainBroker(kafka_bootstrap=bootstrap)
+    ran_domain = RANDomainBroker(domain_name="ran-1", kafka_bootstrap=bootstrap)
+    core_domain = CoreDomainBroker(domain_name="core-1", kafka_bootstrap=bootstrap)
 
     logger.info("SYSTEM: Starting Distributed Backend Components...")
 

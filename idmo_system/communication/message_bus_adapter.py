@@ -6,7 +6,6 @@ from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from loguru import logger as log
 
 from idmo_system.communication.api import DomainHealthMessage, DomainRegistrationRequest, DomainRegistrationResponse
-from idmo_system.mock_broker import MockKafkaBroker, MockNATSBroker
 
 class MessageBusAdapter:
     def __init__(self, kafka_bootstrap="localhost:9092", nats_url="nats://localhost:4222"):
@@ -193,7 +192,6 @@ class MessageBusAdapter:
 
     async def register_new_topic(self, topic_name):
         """Ensures the topic exists in Kafka and then subscribes."""
-        # 1. Create topic via Admin Client (like in your provided code)
         admin_client = AIOKafkaAdminClient(bootstrap_servers=self.kafka_bootstrap)
         await admin_client.start()
         try:

@@ -4,8 +4,8 @@ from idmo_system.domains.base_domain import BaseDomainBroker
 from loguru import logger
 
 class CoreDomainBroker(BaseDomainBroker):
-    def __init__(self, kafka_bootstrap="localhost:9092"):
-        super().__init__(domain_type="core", kafka_bootstrap=kafka_bootstrap)
+    def __init__(self, domain_name=None, kafka_bootstrap="localhost:9092"):
+        super().__init__(domain_type="core", domain_name=domain_name, kafka_bootstrap=kafka_bootstrap)
 
     async def start(self):
         core_caps = {

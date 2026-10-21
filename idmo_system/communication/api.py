@@ -35,6 +35,27 @@ class UnityRanCapabilities(BaseModel):
     core_links: dict[str, float] = {}
 
 
+class RanRFS(BaseModel):
+    """Resource Facing Service requested from a RAN domain. Missing values (None) are not constrained."""
+    bandwidth_mhz: float | None = None
+    latency_ms: float | None = None
+    throughput_mbps: float | None = None
+    num_ues: int | None = None
+    tac: int | None = None # Tracking Area Code where the service is needed
+    duration_s: float | None = None
+
+
+class CoreRFS(BaseModel):
+    """Resource Facing Service requested from a CORE domain."""
+    priority: int | None = None
+    latency_ms: float | None = None
+
+
+class ResourceFacingService(BaseModel):
+    ran: RanRFS = RanRFS()
+    core: CoreRFS = CoreRFS()
+
+
 class DomainRegistrationRequest(BaseMessage):
     kafka_topic = 'unity6g.domain.registration.request'
     message_type: str = 'DomainRegistrationRequest'
