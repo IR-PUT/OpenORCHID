@@ -24,7 +24,7 @@ def test_ran_feasibility_uses_remaining_capacity():
     ran = RANDomainBroker("ran", RAN_CAPS, RanBehavior(max_bandwidth_mhz=100))
 
     assert run(ran.handle_feasibility(request("A", bandwidth_mhz=80, tac=10))).ok
-    run(ran.handle_provisioning(request("A", bandwidth_mhz=80, num_ues=60)))
+    ran.confirm("A", ran.resources_for(request("A", bandwidth_mhz=80, num_ues=60)))
 
     result = run(ran.handle_feasibility(request("B", bandwidth_mhz=50, num_ues=50)))
     assert not result.ok
@@ -44,11 +44,31 @@ def test_ran_rejects_uncovered_ta():
 
 def test_core_service_limit():
     core = CoreDomainBroker("core", CORE_CAPS, CoreBehavior(max_services=1))
-    run(core.handle_provisioning(request("A", num_ues=10)))
+    core.confirm("A", core.resources_for(request("A", num_ues=10)))
     result = run(core.handle_feasibility(request("B")))
     assert not result.ok and "service limit reached (1/1)" in result.reason
     core.release("A")
     assert run(core.handle_feasibility(request("B"))).ok
+
+
+def test_holds_count_until_released_or_expired(monkeypatch):
+    ran = RANDomainBroker("ran", RAN_CAPS, RanBehavior(max_bandwidth_mhz=100))
+    ran.hold("A", attempt=0, amounts={"bandwidth_mhz": 60})
+    assert ran.reserved("bandwidth_mhz") == 60
+
+    ran.release_hold("A", attempt=1) # release for another attempt is ignored
+    assert ran.reserved("bandwidth_mhz") == 60
+    ran.release_hold("A", attempt=0)
+    assert ran.reserved("bandwidth_mhz") == 0
+
+    ran.hold("B", attempt=0, amounts={"bandwidth_mhz": 30})
+    ran.confirm("B", {"bandwidth_mhz": 30})
+    ran.release_hold("B", attempt=0) # a provisioned service is released only by termination
+    assert ran.reserved("bandwidth_mhz") == 30
+
+    ran.hold("C", attempt=0, amounts={"bandwidth_mhz": 10})
+    monkeypatch.setattr(ran, "HOLD_TTL_S", -1) # every unconfirmed hold is now expired
+    assert ran.reserved("bandwidth_mhz") == 30
 
 
 def ran_with_telemetry(**telemetry):

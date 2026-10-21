@@ -1,7 +1,7 @@
 {
   "scenario": "multi_domain",
   "passed": true,
-  "elapsed_s": 28.89,
+  "elapsed_s": 28.71,
   "registered_domains": [
     "core-central",
     "core-edge",
@@ -19,8 +19,8 @@
       "request": {
         "expression": "Low-latency slice for robots in TA 1000 for 20 seconds, 100 MHz, latency under 10 ms."
       },
-      "intent_id": "INT-4864E5F8",
-      "submitted_at_s": 0.00045769999269396067,
+      "intent_id": "INT-32626DDB",
+      "submitted_at_s": 0.00046799995470792055,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-urban",
@@ -40,8 +40,8 @@
       "last_message": "Service lifecycle expired and resources released.",
       "history": [
         {
-          "t_s": 2.114,
-          "intent_id": "INT-4864E5F8",
+          "t_s": 2.113,
+          "intent_id": "INT-32626DDB",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -60,14 +60,14 @@
           ]
         },
         {
-          "t_s": 4.121,
+          "t_s": 4.123,
           "message_type": "IntentStatusUpdate",
-          "intent_id": "INT-4864E5F8",
+          "intent_id": "INT-32626DDB",
           "current_handling_state": "STATE_COMPLIES"
         },
         {
-          "t_s": 22.154,
-          "intent_id": "INT-4864E5F8",
+          "t_s": 22.138,
+          "intent_id": "INT-32626DDB",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Service lifecycle expired and resources released."
         }
@@ -89,8 +89,8 @@
           }
         }
       },
-      "intent_id": "INT-5045BBDF",
-      "submitted_at_s": 2.01584610005375,
+      "intent_id": "INT-55BD280E",
+      "submitted_at_s": 2.0136418000329286,
       "final_state": "REJECTED",
       "selected_domains": null,
       "attempts": [
@@ -100,11 +100,11 @@
           "ran_ok": false,
           "core_ok": true,
           "reasons": {
-            "ran": "1000 MHz requested, 400 MHz available"
+            "ran": "1000 MHz requested, 300 MHz available"
           },
           "proposals": {
             "ran": {
-              "bandwidth_mhz": 400.0,
+              "bandwidth_mhz": 300.0,
               "num_ues": 1000
             }
           }
@@ -159,9 +159,9 @@
       "last_message": "Feasibility check failed for all 4 candidate(s); last: ran-suburban: 1000 MHz requested, 200 MHz available.",
       "history": [
         {
-          "t_s": 2.05,
-          "intent_id": "INT-5045BBDF",
-          "message": "Attempt 1/4 rejected (ran-urban: 1000 MHz requested, 400 MHz available), trying next candidate.",
+          "t_s": 2.046,
+          "intent_id": "INT-55BD280E",
+          "message": "Attempt 1/4 rejected (ran-urban: 1000 MHz requested, 300 MHz available), trying next candidate.",
           "attempts": [
             {
               "ran": "ran-urban",
@@ -169,11 +169,11 @@
               "ran_ok": false,
               "core_ok": true,
               "reasons": {
-                "ran": "1000 MHz requested, 400 MHz available"
+                "ran": "1000 MHz requested, 300 MHz available"
               },
               "proposals": {
                 "ran": {
-                  "bandwidth_mhz": 400.0,
+                  "bandwidth_mhz": 300.0,
                   "num_ues": 1000
                 }
               }
@@ -181,8 +181,8 @@
           ]
         },
         {
-          "t_s": 2.112,
-          "intent_id": "INT-5045BBDF",
+          "t_s": 2.11,
+          "intent_id": "INT-55BD280E",
           "message": "Attempt 2/4 rejected (ran-suburban: 1000 MHz requested, 200 MHz available), trying next candidate.",
           "attempts": [
             {
@@ -191,11 +191,11 @@
               "ran_ok": false,
               "core_ok": true,
               "reasons": {
-                "ran": "1000 MHz requested, 400 MHz available"
+                "ran": "1000 MHz requested, 300 MHz available"
               },
               "proposals": {
                 "ran": {
-                  "bandwidth_mhz": 400.0,
+                  "bandwidth_mhz": 300.0,
                   "num_ues": 1000
                 }
               }
@@ -218,8 +218,8 @@
           ]
         },
         {
-          "t_s": 2.174,
-          "intent_id": "INT-5045BBDF",
+          "t_s": 2.173,
+          "intent_id": "INT-55BD280E",
           "message": "Attempt 3/4 rejected (ran-urban: 1000 MHz requested, 300 MHz available), trying next candidate.",
           "attempts": [
             {
@@ -228,11 +228,11 @@
               "ran_ok": false,
               "core_ok": true,
               "reasons": {
-                "ran": "1000 MHz requested, 400 MHz available"
+                "ran": "1000 MHz requested, 300 MHz available"
               },
               "proposals": {
                 "ran": {
-                  "bandwidth_mhz": 400.0,
+                  "bandwidth_mhz": 300.0,
                   "num_ues": 1000
                 }
               }
@@ -270,8 +270,8 @@
           ]
         },
         {
-          "t_s": 2.237,
-          "intent_id": "INT-5045BBDF",
+          "t_s": 2.236,
+          "intent_id": "INT-55BD280E",
           "current_handling_state": "REJECTED",
           "message": "Feasibility check failed for all 4 candidate(s); last: ran-suburban: 1000 MHz requested, 200 MHz available.",
           "attempts": [
@@ -281,11 +281,11 @@
               "ran_ok": false,
               "core_ok": true,
               "reasons": {
-                "ran": "1000 MHz requested, 400 MHz available"
+                "ran": "1000 MHz requested, 300 MHz available"
               },
               "proposals": {
                 "ran": {
-                  "bandwidth_mhz": 400.0,
+                  "bandwidth_mhz": 300.0,
                   "num_ues": 1000
                 }
               }
@@ -363,8 +363,8 @@
           }
         }
       },
-      "intent_id": "INT-7C2B37D1",
-      "submitted_at_s": 4.00767950003501,
+      "intent_id": "INT-4B860EED",
+      "submitted_at_s": 4.010813000029884,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-urban",
@@ -384,8 +384,8 @@
       "last_message": "Service lifecycle expired and resources released.",
       "history": [
         {
-          "t_s": 6.133,
-          "intent_id": "INT-7C2B37D1",
+          "t_s": 6.136,
+          "intent_id": "INT-4B860EED",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -404,14 +404,14 @@
           ]
         },
         {
-          "t_s": 8.148,
+          "t_s": 8.139,
           "message_type": "IntentStatusUpdate",
-          "intent_id": "INT-7C2B37D1",
+          "intent_id": "INT-4B860EED",
           "current_handling_state": "STATE_DEGRADES"
         },
         {
-          "t_s": 26.195,
-          "intent_id": "INT-7C2B37D1",
+          "t_s": 26.201,
+          "intent_id": "INT-4B860EED",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Service lifecycle expired and resources released."
         }
@@ -434,8 +434,8 @@
           }
         }
       },
-      "intent_id": "INT-64734549",
-      "submitted_at_s": 8.00637179997284,
+      "intent_id": "INT-F9F3D777",
+      "submitted_at_s": 8.013535300036892,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-suburban",
@@ -503,8 +503,8 @@
       "last_message": "Service lifecycle expired and resources released.",
       "history": [
         {
-          "t_s": 8.055,
-          "intent_id": "INT-64734549",
+          "t_s": 8.048,
+          "intent_id": "INT-F9F3D777",
           "message": "Attempt 1/4 rejected (ran-urban: 150 MHz requested, 100 MHz available, core-edge: service limit reached (2/2)), trying next candidate.",
           "attempts": [
             {
@@ -529,8 +529,8 @@
           ]
         },
         {
-          "t_s": 8.117,
-          "intent_id": "INT-64734549",
+          "t_s": 8.109,
+          "intent_id": "INT-F9F3D777",
           "message": "Attempt 2/4 rejected (core-edge: service limit reached (2/2)), trying next candidate.",
           "attempts": [
             {
@@ -569,8 +569,8 @@
           ]
         },
         {
-          "t_s": 8.18,
-          "intent_id": "INT-64734549",
+          "t_s": 8.171,
+          "intent_id": "INT-F9F3D777",
           "message": "Attempt 3/4 rejected (ran-urban: 150 MHz requested, 100 MHz available), trying next candidate.",
           "attempts": [
             {
@@ -624,8 +624,8 @@
           ]
         },
         {
-          "t_s": 10.338,
-          "intent_id": "INT-64734549",
+          "t_s": 10.283,
+          "intent_id": "INT-F9F3D777",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -692,14 +692,14 @@
           ]
         },
         {
-          "t_s": 12.348,
+          "t_s": 12.288,
           "message_type": "IntentStatusUpdate",
-          "intent_id": "INT-64734549",
+          "intent_id": "INT-F9F3D777",
           "current_handling_state": "STATE_COMPLIES"
         },
         {
-          "t_s": 25.387,
-          "intent_id": "INT-64734549",
+          "t_s": 25.322,
+          "intent_id": "INT-F9F3D777",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Service lifecycle expired and resources released."
         }
@@ -721,8 +721,8 @@
           }
         }
       },
-      "intent_id": "INT-E78E431F",
-      "submitted_at_s": 10.005557799944654,
+      "intent_id": "INT-F8F6A3F3",
+      "submitted_at_s": 10.011952099972405,
       "final_state": "REJECTED",
       "selected_domains": null,
       "attempts": [],
@@ -730,8 +730,8 @@
       "last_message": "Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).",
       "history": [
         {
-          "t_s": 10.009,
-          "intent_id": "INT-E78E431F",
+          "t_s": 10.017,
+          "intent_id": "INT-F8F6A3F3",
           "current_handling_state": "REJECTED",
           "message": "Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).",
           "attempts": [],
@@ -747,7 +747,7 @@
         "expression": "Something the mock LLM does not know."
       },
       "intent_id": null,
-      "submitted_at_s": 12.00327109999489,
+      "submitted_at_s": 12.004860499990173,
       "final_state": "SUBMISSION_FAILED",
       "selected_domains": null,
       "attempts": [],

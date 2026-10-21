@@ -1,22 +1,22 @@
-10:52:56 | #0 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 1000, 'duration_s': 60.0}, 'core': {'priority': 1}}} -> INT-49FED00B
-10:52:56 | #1 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 2000, 'duration_s': 60.0}, 'core': {'priority': 1}}} -> INT-56B35D06
-10:52:58 | INT-49FED00B update: {'intent_id': 'INT-49FED00B', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-a', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-a', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
-10:53:00 | INT-56B35D06 update: {'intent_id': 'INT-56B35D06', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-c', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-c', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
-10:53:01 | EVENT {'t_s': 5.011, 'at_s': 5.0, 'domain': 'ran-a', 'action': 'crash', 'throughput_factor': 1.0, 'latency_factor': 1.0}
-10:53:01 | EVENT {'t_s': 5.012, 'at_s': 5.0, 'domain': 'ran-c', 'action': 'stop_heartbeat', 'throughput_factor': 1.0, 'latency_factor': 1.0}
-10:53:05 | INT-56B35D06 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-56B35D06', 'current_handling_state': 'STATE_COMPLIES'}
-10:53:08 | INT-49FED00B update: {'intent_id': 'INT-49FED00B', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Critical: Domain ran-a lost heartbeat.'}
-10:53:08 | INT-56B35D06 update: {'intent_id': 'INT-56B35D06', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Critical: Domain ran-c lost heartbeat.'}
-10:53:14 | #2 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 1000, 'duration_s': 10.0}, 'core': {'priority': 1}}} -> INT-01F652BA
-10:53:16 | INT-01F652BA update: {'intent_id': 'INT-01F652BA', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-b', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-b', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
-10:53:21 | INT-01F652BA update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-01F652BA', 'current_handling_state': 'STATE_COMPLIES'}
-10:53:26 | INT-01F652BA update: {'intent_id': 'INT-01F652BA', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
-10:53:27 | Scenario 'domain_failure' finished after 32.7s
+11:09:37 | #0 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 1000, 'duration_s': 60.0}, 'core': {'priority': 1}}} -> INT-0C747F87
+11:09:37 | #1 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 2000, 'duration_s': 60.0}, 'core': {'priority': 1}}} -> INT-2409DF0B
+11:09:39 | INT-0C747F87 update: {'intent_id': 'INT-0C747F87', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-a', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-a', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:09:41 | INT-2409DF0B update: {'intent_id': 'INT-2409DF0B', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-c', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-c', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:09:42 | EVENT {'t_s': 5.001, 'at_s': 5.0, 'domain': 'ran-a', 'action': 'crash', 'throughput_factor': 1.0, 'latency_factor': 1.0}
+11:09:42 | EVENT {'t_s': 5.002, 'at_s': 5.0, 'domain': 'ran-c', 'action': 'stop_heartbeat', 'throughput_factor': 1.0, 'latency_factor': 1.0}
+11:09:46 | INT-2409DF0B update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-2409DF0B', 'current_handling_state': 'STATE_COMPLIES'}
+11:09:49 | INT-0C747F87 update: {'intent_id': 'INT-0C747F87', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Critical: Domain ran-a lost heartbeat.'}
+11:09:49 | INT-2409DF0B update: {'intent_id': 'INT-2409DF0B', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Critical: Domain ran-c lost heartbeat.'}
+11:09:55 | #2 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 1000, 'duration_s': 10.0}, 'core': {'priority': 1}}} -> INT-3859D1DB
+11:09:57 | INT-3859D1DB update: {'intent_id': 'INT-3859D1DB', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-b', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-b', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:10:02 | INT-3859D1DB update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-3859D1DB', 'current_handling_state': 'STATE_COMPLIES'}
+11:10:07 | INT-3859D1DB update: {'intent_id': 'INT-3859D1DB', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:10:08 | Scenario 'domain_failure' finished after 32.8s
 Registered domains: core-1, ran-a, ran-b, ran-c
  #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
- 0    0.0  INT-49FED00B  HANDLING_ENDED     ran-a+core-1                    1  -         Critical: Domain ran-a lost heartbeat.
- 1    0.0  INT-56B35D06  HANDLING_ENDED     ran-c+core-1                    1  -         Critical: Domain ran-c lost heartbeat.
- 2   18.0  INT-01F652BA  HANDLING_ENDED     ran-b+core-1                    1  -         Service lifecycle expired and resources released.
+ 0    0.0  INT-0C747F87  HANDLING_ENDED     ran-a+core-1                    1  -         Critical: Domain ran-a lost heartbeat.
+ 1    0.0  INT-2409DF0B  HANDLING_ENDED     ran-c+core-1                    1  -         Critical: Domain ran-c lost heartbeat.
+ 2   18.0  INT-3859D1DB  HANDLING_ENDED     ran-b+core-1                    1  -         Service lifecycle expired and resources released.
 Events: crash ran-a @5.0s, stop_heartbeat ran-c @5.0s
 Expectations: 3/3 passed
 RESULT: PASSED

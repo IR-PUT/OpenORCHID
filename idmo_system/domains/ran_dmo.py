@@ -81,9 +81,11 @@ class RANDomainBroker(BaseDomainBroker):
                                      reason="; ".join(reasons))
         return FeasibilityResult(True)
 
-    async def handle_provisioning(self, data):
+    def resources_for(self, data):
         rfs = data.get("rfs_ran") or {}
-        self.reserve(data["intent_id"], bandwidth_mhz=rfs.get("bandwidth_mhz") or 0, num_ues=rfs.get("num_ues") or 0)
+        return {"bandwidth_mhz": rfs.get("bandwidth_mhz") or 0, "num_ues": rfs.get("num_ues") or 0}
+
+    async def handle_provisioning(self, data):
         return f"ran_slice_{data['intent_id']}"
     
     async def setup_telemetry(self, data, service_topic):

@@ -10,42 +10,32 @@ OpenORCHID - Open version of ORCHestration for Inter-Domain management
 
 OpenORCHID is an event-driven orchestration system for managing multi-domain network services (e.g., RAN and CORE). It combines service lifecycle control via the **Saga pattern**, a **dual-bus (NATS + Kafka) integration layer**, and **LLM-based translation** of natural-language intents into structured service requests.
 
+The whole system — domains, their capabilities and behaviour, the intents and the faults that happen along the way — is described by **scenario files (YAML)**. The same scenario runs fully in-process (mocked Kafka, NATS and LLM) or against real infrastructure, and can carry expectations, which makes it a test.
+
 ## Key Ideas
 
 - **Hybrid event architecture** — NATS handles orchestration/control-plane events, while Kafka handles domain/service transport and dynamic channelization.
 - **Saga-based lifecycle** — every intent is driven through Preparation → Commissioning → Operation → Decommissioning phases, correlating asynchronous responses across domains.
+- **Capability-driven domain selection** — candidate (RAN, CORE) pairs are filtered by coverage and link latency, ranked by a pluggable strategy, and asked for feasibility one by one until one accepts.
 - **Dynamic infrastructure** — domain registration and service provisioning automatically create the Kafka topics they need, and lifecycle completion triggers cleanup.
-- **Intent-driven ingress** — a FastAPI gateway accepts natural-language intents and uses an LLM-backed translator to produce a strict, validated schema (RFS) for RAN and CORE domains.
+- **Intent-driven ingress** — a FastAPI gateway accepts natural-language intents (translated by an LLM into a strict, validated RFS schema) or structured RFS requests.
 - **Built-in observability** — an SLA monitor closes the loop by comparing live telemetry against target constraints and raising compliance/fault signals.
 
-## Architecture at a Glance
+## Quick Start
 
-| Layer | Responsibility |
-|---|---|
-| `idmo_system/core/` | Service orchestration (Saga), domain registry, SLA monitoring |
-| `idmo_system/communication/` | NATS↔Kafka bridge and shared message contracts |
-| `idmo_system/domains/` | Domain broker base + RAN/CORE-specific behavior |
-| `idmo_system/gateway/` | HTTP intent ingress and NL→RFS translation |
-| `idmo_system/mocks/` | In-process mocks for Kafka, NATS and the LLM, for local demos/tests |
-| `idmo_system/scenario.py`, `runner.py` | Scenario files (YAML) and the runner that builds and drives the system |
-
-## Getting Started
-
-The system is driven by **scenario files** (YAML) describing the domains (capabilities and behaviour),
-the intents to submit and the runtime settings. See [`scenarios/`](scenarios/) for examples.
+Requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
+uv sync
+
 # Check a scenario file
 uv run python -m idmo_system validate scenarios/multi_domain.yaml
 
 # Run it - by default with in-process mocks of Kafka, NATS and the LLM, no infrastructure needed
 uv run python -m idmo_system run scenarios/multi_domain.yaml
-
-# The original single-intent demo (same as: run scenarios/basic.yaml)
-uv run python run_all.py
 ```
 
-At the end the runner prints a summary of every intent, e.g.:
+At the end the runner prints a summary of every intent and checks the scenario's expectations:
 
 ```
  #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
@@ -55,39 +45,104 @@ At the end the runner prints a summary of every intent, e.g.:
  3    8.0  INT-35E514D4  HANDLING_ENDED     ran-suburban+core-central       4  -         Service lifecycle expired and resources released.
  4   10.0  INT-9441C816  REJECTED           -                               0  -         Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).
  5   12.0  -             SUBMISSION_FAILED  -                               0  -         HTTP 422: Translation Error: Translator returned no data for the given expression.
+Expectations: 6/6 passed
+RESULT: PASSED
 ```
+
+All NATS and Kafka messages, the intent status updates and a `report.json` with the full result (every feasibility attempt, rejection reasons, proposals, status history) are written to `results/<scenario name>/`.
+
+## Example Scenarios
+
+| Scenario | Shows |
+|---|---|
+| [`basic`](scenarios/basic.yaml) | One RAN, one CORE, one natural-language intent through the whole lifecycle |
+| [`multi_domain`](scenarios/multi_domain.yaml) | Domain selection (TA coverage, link latency), capacity limits, retries with the next candidate |
+| [`capacity_exhaustion`](scenarios/capacity_exhaustion.yaml) | Least-loaded balancing until capacity runs out; capacity returns when services expire |
+| [`domain_failure`](scenarios/domain_failure.yaml) | A crashed RAN and a RAN without heartbeats; resources released for later intents |
+| [`sla_degradation`](scenarios/sla_degradation.yaml) | Degrading, randomly fluctuating and temporarily degraded telemetry vs. the SLA |
+| [`custom_domain`](scenarios/custom_domain.yaml) | A domain with user-defined logic (custom broker class) |
+
+## Writing a Scenario
+
+```yaml
+name: my-scenario
+runtime: { duration_s: 60, transport: mock, llm: mock }   # transport: real / llm: ollama -> docker compose up -d
+orchestrator: { domain_selection: lowest_latency, max_candidates: 3 }
+
+domains:
+  - name: ran-1
+    type: ran
+    capabilities: { maxNumberofUEs: 100, nROperatingBands: [n78], coverageAreaTAList: [[260, 1, 100]], positioning: true,
+                    core_links: { core-1: 5.0 } }                 # reachable CORE domains and link latency [ms]
+    behavior:
+      max_bandwidth_mhz: 400                                       # capacity shared by all services on this RAN
+      telemetry: { interval_s: 5, profile: constant, throughput_mbps: 80, latency_ms: 10 }
+  - name: core-1
+    type: core
+    capabilities: { cpu: 8, memory_gb: 16, storage_gb: 100, maxNumberofUEs: 5000 }
+    behavior: { max_services: 10 }
+
+intents:
+  - at_s: 0                                                        # seconds after all domains are up
+    rfs: { ran: { bandwidth_mhz: 100, latency_ms: 20, tac: 100, duration_s: 20 }, core: { priority: 1 } }
+  - at_s: 5
+    expression: We need a RAN with 100MHz bandwidth and 10ms latency. The core network should have 15ms latency and priority 1.
+
+events:
+  - { at_s: 10, domain: ran-1, action: degrade, latency_factor: 3.0 }      # 30 ms > the 20 ms requested
+
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-1, sla_degraded: true }
+```
+
+The main sections:
+
+- **`runtime`** — run length, `transport` (`mock` / `real`), `llm` (`mock` / `ollama`), endpoints, `seed`, `output_dir`.
+- **`orchestrator`** — `domain_selection` strategy, `max_candidates`, `feasibility_timeout_s`.
+- **`registry`** — `heartbeat_interval_s`, `max_missed_heartbeats`.
+- **`domains`** — `capabilities` (what the domain registers with) and `behavior` (capacity, telemetry profile).
+- **`intents`** — natural-language `expression` (translated by the LLM) or structured `rfs`.
+- **`translations`** — answers of the mock LLM: expression → RFS.
+- **`events`** — `crash`, `stop_heartbeat`, `degrade` / `restore` at a given time.
+- **`expect`** — per intent: `final_state`, `ran`, `core`, `attempts`, `sla_degraded`, `message_contains`.
+
+The files are validated strictly (unknown fields, references to unknown domains and similar mistakes are reported with their location), and `python -m idmo_system run` exits with code 1 when an expectation fails.
 
 ### How domains are chosen
 
 1. **Filtering** (orchestrator, from registered capabilities): the domain is UP, the RAN covers the requested
    TA (`rfs.ran.tac`), the RAN has a link to the CORE (`core_links`) and the link latency is within `rfs.core.latency_ms`.
 2. **Ranking** with the strategy set in `orchestrator.domain_selection`: `first_available`, `least_loaded`,
-   `lowest_latency` or `random`. Own strategies can be added with `@register_strategy("name")` in
-   `idmo_system/core/domain_selection.py`.
+   `lowest_latency` or `random`.
 3. **Feasibility with retries**: the saga asks the best (RAN, CORE) pair; each domain checks its *current* load
-   (RAN: bandwidth, UEs, coverage; CORE: number of services, UEs). If either rejects, the next pair is tried,
-   up to `orchestrator.max_candidates`. A rejected intent reports the reasons and what the domains could offer instead.
+   (RAN: bandwidth, UEs, coverage; CORE: number of services, UEs) and holds the resources when it accepts.
+   If either domain rejects, the holds are released and the next pair is tried, up to `orchestrator.max_candidates`.
+   A rejected intent reports the reasons and what the domains could offer instead.
 
-A minimal scenario:
+## Extending
+
+**Own domain logic** — subclass `RANDomainBroker` or `CoreDomainBroker` and point the scenario at it; `params` are passed to the constructor:
 
 ```yaml
-name: my-scenario
-runtime: { duration_s: 60, transport: mock, llm: mock }   # transport: real / llm: ollama -> docker compose up -d
-domains:
-  - name: ran-1
+  - name: ran-hospital
     type: ran
-    capabilities: { maxNumberofUEs: 100, nROperatingBands: [n78], coverageAreaTAList: [[260, 1, 100]], positioning: true,
-                    core_links: { core-1: 5.0 } }
-    behavior: { max_bandwidth_mhz: 400, telemetry: { interval_s: 5, throughput_mbps: 80, latency_ms: 10 } }
-  - name: core-1
-    type: core
-    capabilities: { cpu: 8, memory_gb: 16, storage_gb: 100, maxNumberofUEs: 5000 }
-intents:
-  - at_s: 0
-    rfs: { ran: { bandwidth_mhz: 100, latency_ms: 20, duration_s: 20 }, core: { priority: 1 } }
+    class: examples.priority_ran:PriorityRanBroker
+    params: { protected_mhz: 50 }
 ```
 
-Scenarios can also be run from Python:
+See [`examples/priority_ran.py`](examples/priority_ran.py): a RAN that keeps part of its bandwidth for priority-1 services. The methods to override are `handle_feasibility()`, `resources_for()`, `handle_provisioning()`, `compute_metrics()` (RAN telemetry) and `apply_event()`.
+
+**Own selection strategy** — register a function that orders the candidates, before the scenario is loaded:
+
+```python
+from idmo_system.core.domain_selection import register_strategy
+
+@register_strategy("prefer_central")
+def prefer_central(candidates, rng):
+    return sorted(candidates, key=lambda c: c.core != "core-central")
+```
+
+**From Python** — scenarios can be built in code or loaded from YAML and run programmatically:
 
 ```python
 import asyncio
@@ -97,38 +152,36 @@ from idmo_system.runner import ScenarioRunner
 
 result = asyncio.run(ScenarioRunner(Scenario.from_yaml("scenarios/basic.yaml")).run())
 print(result.summary())
+print(result.to_dict()["intents"][0]["attempts"])
 ```
 
-### Domain behaviour, events and expectations
+## Running on Real Infrastructure
 
-Simulated domains can be given different **telemetry profiles** (`constant`, `random`, `degrading`), and a scenario can
-inject **events** at given times: `crash` (the domain stops completely), `stop_heartbeat` (the registry declares it lost),
-`degrade` / `restore` (RAN telemetry worsens temporarily). An `expect` section turns a scenario into a test:
-
-```yaml
-events:
-  - { at_s: 5, domain: ran-a, action: crash }
-  - { at_s: 5, domain: ran-b, action: degrade, throughput_factor: 0.5, latency_factor: 3.0 }
-expect:
-  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-a, message_contains: "lost heartbeat" }
-  - { intent: 1, final_state: REJECTED, attempts: 4 }
-  - { intent: 2, sla_degraded: true }
-```
-
-`python -m idmo_system run` exits with code 1 when an expectation fails. Example scenarios:
-
-| Scenario | Shows |
-|---|---|
-| `basic` | One RAN, one CORE, one intent through the whole lifecycle |
-| `multi_domain` | Domain selection (link latency, TA coverage), capacity limits, retries with the next candidate |
-| `domain_failure` | A crashed RAN and a RAN without heartbeats; resources released for later intents |
-| `sla_degradation` | Degrading, randomly fluctuating and temporarily degraded telemetry vs. the SLA |
-
-### Tests
+`docker-compose.yaml` starts Kafka (with Kafka UI on port 8080), NATS and Ollama with the `qwen2.5-coder:1.5b` model:
 
 ```bash
-uv run pytest                     # unit tests + every scenario in scenarios/ (~2 min)
+docker compose up -d
+```
+
+Then set `runtime.transport: real` (and `runtime.llm: ollama` for natural-language intents) in the scenario. The intent gateway (`GET /intents`, `GET /intents/{intent_id}`, `POST /intents`) listens on `runtime.gateway_port` (8000) while a scenario runs.
+
+## Tests
+
+```bash
+uv run pytest                     # unit tests + every scenario in scenarios/ (~3 min)
 uv run pytest -m "not scenario"   # unit tests only (~1 s)
 ```
 
-Runtime traces (all NATS and Kafka messages, intent updates) and a `report.json` with the full result are written to `results/<scenario name>/`.API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).
+Every file in `scenarios/` must have an `expect` section — adding a scenario adds a test.
+
+## Architecture at a Glance
+
+| Layer | Responsibility |
+|---|---|
+| `idmo_system/core/` | Service orchestration (Saga), domain selection, domain registry, SLA monitoring |
+| `idmo_system/communication/` | NATS↔Kafka bridge and shared message contracts (capabilities, RFS) |
+| `idmo_system/domains/` | Domain broker base + RAN/CORE brokers, behaviour and events |
+| `idmo_system/gateway/` | HTTP intent ingress and NL→RFS translation |
+| `idmo_system/scenario.py`, `runner.py`, `__main__.py` | Scenario model, runner and CLI |
+| `idmo_system/mocks/` | In-process mocks for Kafka, NATS and the LLM |
+| `scenarios/`, `examples/`, `tests/` | Example scenarios, a custom domain broker, the test suite |

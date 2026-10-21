@@ -93,6 +93,7 @@ class MessageBusAdapter:
     async def nats_to_kafka_bridge(self):
         registration_ack_sub = await self.nc.subscribe("domain.registration.ack")
         feasibility_sub = await self.nc.subscribe("feasibility.check.request")
+        feasibility_release_sub = await self.nc.subscribe("feasibility.release")
         provision_sub = await self.nc.subscribe("service.order.request.dispatch")
         termination_sub = await self.nc.subscribe("service.order.terminate")
         clean_topics_sub = await self.nc.subscribe("clean.topics")
@@ -130,6 +131,13 @@ class MessageBusAdapter:
                     await self._route_to_kafka_domain_specific_topic(data, msg.data)
                 except Exception as e:
                     log.error(f"MBA: Feasibility routing error: {e}")
+
+        async def handle_feasibility_release():
+            async for msg in feasibility_release_sub.messages:
+                try:
+                    await self._route_to_kafka_domain_specific_topic(json.loads(msg.data.decode()), msg.data)
+                except Exception as e:
+                    log.error(f"MBA: Feasibility release routing error: {e}")
 
         async def handle_provisioning():
             async for msg in provision_sub.messages:
@@ -180,7 +188,8 @@ class MessageBusAdapter:
                     log.error(f"MBA: Infrastructure cleanup error: {e}")
 
         await asyncio.gather(handle_registration_acks(), 
-                             handle_feasibility(), 
+                             handle_feasibility(),
+                             handle_feasibility_release(),
                              handle_provisioning(),
                              handle_termination(),
                              handle_domain_infrastructure_cleanup())

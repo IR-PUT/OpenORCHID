@@ -4,10 +4,11 @@ Public **demo** of an IDMO (Inter-Domain Management & Orchestration) system. The
 is a separate, heavily rebuilt codebase (not in this repo). This repo should stay small and readable
 as a showcase: don't over-engineer and don't import concepts from the private version unless asked.
 
-**Ongoing work: see `PLAN.md`** (configurable YAML scenarios; one branch per stage, `refactoring-step-N`).
+Refactoring history and next steps: `PLAN.md` (stages 0–4 done, one branch per stage `refactoring-step-N`).
 
 ## Stack / run
-- Python >=3.13, `uv` (`pyproject.toml` name still `idmo-first`). Deps: aiokafka, nats-py, fastapi, uvicorn, pydantic, aiohttp, loguru.
+- Python >=3.13, `uv` (package `openorchid`, not installed - run from repo root). Deps: aiokafka, nats-py, fastapi,
+  uvicorn, pydantic, aiohttp, loguru, pyyaml; dev: pytest.
 - `uv run python -m idmo_system run scenarios/<file>.yaml` (or `validate`); `run_all.py` = basic scenario.
   Scenario = YAML validated by `idmo_system/scenario.py`; `runner.py` builds everything in one process.
   `runtime.transport: mock` → `idmo_system.mocks.install()` **patches `sys.modules`** for `aiokafka`/`nats`, so
@@ -15,10 +16,10 @@ as a showcase: don't over-engineer and don't import concepts from the private ve
   `real` uses `docker-compose.yaml` (Kafka :9092, Kafka UI :8080, NATS :4222, Ollama :11434 `qwen2.5-coder:1.5b`).
   `runtime.llm: mock` → `MockIntentTranslator` with scenario `translations`.
 - Output: `results/<scenario>/{nats,kafka,intents}.log` + `report.json` + summary on stdout (exit 1 if `expect` fails).
-  `logs/` = output of the original demo.
+- Custom domain logic: domain `class: package.module:ClassName` + `params` (subclass of RAN/CoreDomainBroker),
+  example `examples/priority_ran.py`. Custom strategies: `@register_strategy` before loading the scenario.
 - `idmo_system/distributed_system_run.py` — backend only (no gateway), real brokers.
-- `main.py` — **stale**: imports non-existent `src.idmo`, `src.service_adapter` (leftover from an older layout).
-- Tests: `uv run pytest` (~2 min, runs every `scenarios/*.yaml`; each needs an `expect` section);
+- Tests: `uv run pytest` (~3 min, runs every `scenarios/*.yaml`; each needs an `expect` section);
   `uv run pytest -m "not scenario"` = unit tests only (~1 s). `tests/conftest.py` installs the mocks first. No linter config.
 
 ## Architecture (idmo_system/)
@@ -39,18 +40,18 @@ as a showcase: don't over-engineer and don't import concepts from the private ve
 - `domains/base_domain.py` `BaseDomainBroker` (Kafka only): register → heartbeats → feasibility/provisioning on
   `to.` topic (read from `earliest`), termination on service topic. `ran_dmo.py` / `core_dmo.py` take
   capabilities (api.py models) + behaviour (`domains/behavior.py`). `handle_feasibility` returns `FeasibilityResult`;
-  `reserve()`/`release()` track per-intent resources (released automatically on termination).
+  resources (`resources_for()`) are held on a positive feasibility (per intent + attempt), confirmed on provisioning,
+  released on `FeasibilityRelease` (saga moved on), termination, or after `HOLD_TTL_S`.
 - `gateway/intent_gateway.py`: `create_app(nats_url, translator)` → FastAPI `POST /intents` (`expression` or structured `rfs`),
   `GET /intents[/{id}]`; ISR in `app.state`, updated from `intent.status.update`.
   `gateway/translator.py`: Ollama `/api/generate` with JSON-schema `format`.
 - `mocks/`: `kafka_mock.py`, `nats_mock.py` (`install()`/`reset()`), `llm_mock.py` (`MockIntentTranslator`).
 
 NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `domain.heartbeat`, `domain.heartbeat_lost`,
-`domain.inventory.query`, `feasibility.check.{request,response}`, `service.order.request.dispatch`, `service.order.terminate`,
+`domain.inventory.query`, `feasibility.check.{request,response}`, `feasibility.release`, `service.order.request.dispatch`, `service.order.terminate`,
 `service.change.status`, `service.telemetry.report`, `monitor.service.{start,stop}`, `sls.violation`, `intent.status.update`, `clean.topics`.
 
-## Known issues (after Stage 3, 2026-10)
-- Resources reserved at provisioning, not at feasibility → concurrent sagas can overbook a domain.
+## Known issues (after Stage 4, 2026-10)
 - Recovery is TODO (`process_fault` only logs once the SLA threshold is reached; `_handle_service_recovery` ends the
   intent and releases the surviving domain). A lost domain cannot re-register under the same name while still in registry.
-- `main.py` is stale (→ removed in Stage 4).
+- Only tested with mocks; `transport: real` / `llm: ollama` not verified since the refactoring.

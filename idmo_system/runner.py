@@ -10,6 +10,7 @@ One process can use only one transport, because the mocks replace aiokafka/nats 
 """
 
 import asyncio
+import importlib
 import json
 import re
 import time
@@ -37,6 +38,18 @@ def _prepare_transport(transport: str):
             mocks.install(llm=False)
         mocks.reset()
     _active_transport = transport
+
+
+def load_broker_class(class_path: str, base_class: type) -> type:
+    """Imports "package.module:ClassName" (or "package.module.ClassName") and checks it extends base_class."""
+    module_name, _, class_name = class_path.rpartition(":") if ":" in class_path else class_path.rpartition(".")
+    try:
+        cls = getattr(importlib.import_module(module_name), class_name)
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"Cannot load domain broker class '{class_path}': {e}") from e
+    if not (isinstance(cls, type) and issubclass(cls, base_class)):
+        raise ValueError(f"Domain broker class '{class_path}' must be a subclass of {base_class.__name__}")
+    return cls
 
 
 @dataclass
@@ -252,13 +265,13 @@ class ScenarioRunner:
             tasks.append(gateway_task)
 
             for d in self.scenario.domains:
+                base_class = RANDomainBroker if d.type == "ran" else CoreDomainBroker
+                broker_class = load_broker_class(d.class_path, base_class) if d.class_path else base_class
+                kwargs = dict(domain_name=d.name, capabilities=d.capabilities, behavior=d.behavior,
+                              kafka_bootstrap=rt.kafka_bootstrap, **d.params)
                 if d.type == "ran":
-                    seed = None if rt.seed is None else f"{rt.seed}:{d.name}"
-                    broker = RANDomainBroker(domain_name=d.name, capabilities=d.capabilities, behavior=d.behavior,
-                                             kafka_bootstrap=rt.kafka_bootstrap, seed=seed)
-                else:
-                    broker = CoreDomainBroker(domain_name=d.name, capabilities=d.capabilities,
-                                              behavior=d.behavior, kafka_bootstrap=rt.kafka_bootstrap)
+                    kwargs["seed"] = None if rt.seed is None else f"{rt.seed}:{d.name}"
+                broker = broker_class(**kwargs)
                 brokers[d.name] = broker
                 tasks.append(asyncio.create_task(broker.start()))
 

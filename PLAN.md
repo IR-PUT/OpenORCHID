@@ -89,8 +89,7 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - [x] Registry: domain is `PENDING` until its first heartbeat (fixes requests sent to not-yet-listening domains);
       capabilities served as JSON (were a Python repr string).
 - [x] `multi_domain.yaml` rewritten so each mechanism shows in the result.
-- Known limitation: resources are reserved at provisioning, not at feasibility — two sagas checking the same
-  domain at the same moment may overbook it.
+- ~~Known limitation: resources reserved at provisioning~~ → fixed in Stage 4 (holds at feasibility).
 
 ### Stage 3 — behaviours and results · branch `refactoring-step-3`
 - [x] Telemetry profiles (`constant`, `random` with `jitter` + `runtime.seed`, `degrading`) in `TelemetryConfig`.
@@ -106,7 +105,16 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - [x] Fixes found by the new scenarios: PENDING domains get their own (longer) timeout; the MBA handles
       registration ACKs concurrently (startup of N domains ~2 s instead of ~2 s per domain).
 
-### Stage 4 — extensibility and docs
-- `class: mypkg.MyRanBroker` in domain config for user-provided brokers.
-- Example scenarios: `capacity_exhaustion` (`basic`, `multi_domain`, `domain_failure`, `sla_degradation` exist).
-- README rewritten around scenarios; stale `main.py` removed.
+### Stage 4 — extensibility and docs · branch `refactoring-step-4`
+- [x] `class: package.module:ClassName` + `params` in domain config for user-provided brokers
+      (`runner.load_broker_class`, imported after the mocks); example `examples/priority_ran.py` + `custom_domain.yaml`.
+- [x] Scenario `capacity_exhaustion.yaml`.
+- [x] Resources **held at feasibility** (keyed by intent + attempt), confirmed at provisioning, released by
+      `FeasibilityRelease` when the saga moves on, expiring after `HOLD_TTL_S` (30 s) — fixes overbooking found by the
+      new scenarios. Domain API: `resources_for()` instead of reserving in `handle_provisioning()`.
+- [x] README rewritten around scenarios; stale `main.py` and `logs/` removed; package renamed `openorchid`.
+
+## Possible next steps
+- Recovery: re-provision on the next candidate after domain loss / persistent SLA violation (reuse the retry loop).
+- Strategy plugins from the scenario file (today: register in Python before loading the scenario).
+- A domain re-registering after it was declared lost; distributed mode (domains as separate processes).

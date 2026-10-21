@@ -5,7 +5,7 @@ This module must not import aiokafka/nats, so it can be used before the mocks ar
 """
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -52,15 +52,21 @@ class RegistryConfig(_StrictModel):
     max_missed_heartbeats: int = 3
 
 
-class RanDomainConfig(_StrictModel):
+class _DomainConfigBase(_StrictModel):
     name: str
+    # Own broker implementation, "package.module:ClassName" (or "package.module.ClassName"). It must subclass
+    # RANDomainBroker / CoreDomainBroker; it is imported by the runner, after the transport mocks are installed.
+    class_path: str | None = Field(default=None, alias="class", pattern=r"^[A-Za-z_][\w.]*([:.][A-Za-z_]\w*)$")
+    params: dict[str, Any] = {} # Extra keyword arguments for the broker constructor
+
+
+class RanDomainConfig(_DomainConfigBase):
     type: Literal["ran"]
     capabilities: UnityRanCapabilities
     behavior: RanBehavior = RanBehavior()
 
 
-class CoreDomainConfig(_StrictModel):
-    name: str
+class CoreDomainConfig(_DomainConfigBase):
     type: Literal["core"]
     capabilities: UnityCoreCapabilities
     behavior: CoreBehavior = CoreBehavior()

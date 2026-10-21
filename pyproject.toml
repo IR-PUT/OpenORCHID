@@ -1,7 +1,7 @@
 [project]
-name = "idmo-first"
+name = "openorchid"
 version = "0.1.0"
-description = "Add your description here"
+description = "Event-driven inter-domain orchestration (IDMO) demo with configurable YAML scenarios"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

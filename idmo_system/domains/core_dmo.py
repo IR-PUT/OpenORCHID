@@ -28,7 +28,8 @@ class CoreDomainBroker(BaseDomainBroker):
             return FeasibilityResult(False, proposals={"num_ues": free_ues}, reason="; ".join(reasons))
         return FeasibilityResult(True)
 
+    def resources_for(self, data):
+        return {"num_ues": (data.get("rfs_ran") or {}).get("num_ues") or 0}
+
     async def handle_provisioning(self, data):
-        requested_ues = (data.get("rfs_ran") or {}).get("num_ues") or 0
-        self.reserve(data["intent_id"], num_ues=requested_ues)
         return f"core_vm_{data['intent_id']}"

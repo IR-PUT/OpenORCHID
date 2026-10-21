@@ -1,4 +1,5 @@
 import json
+import time
 import asyncio
 import uuid
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ class FeasibilityResult:
 
 
 class BaseDomainBroker:
+    HOLD_TTL_S = 30.0 # Resources held after a positive feasibility answer are freed if not provisioned in time
+
     def __init__(self, domain_type, capabilities: dict, domain_name=None, kafka_bootstrap="localhost:9092"):
         self._domain_type = domain_type
         self.capabilities = capabilities
@@ -27,7 +30,9 @@ class BaseDomainBroker:
         self._topic_idmo_to_domain = None
         self._topic_domain_to_idmo = None
         self._service_listeners = {}
-        self._reservations = {} # intent_id -> {resource: amount}, released on termination
+        # intent_id -> {"amounts": {resource: amount}, "attempt": n, "confirmed": bool, "since": t}
+        # Held on a positive feasibility answer, confirmed on provisioning, released on termination.
+        self._reservations = {}
         
         self._temporary_domain_id = f"temp_{domain_type}_{uuid.uuid4().hex[:6]}"
         self.producer = None
@@ -182,13 +187,21 @@ class BaseDomainBroker:
 
         if msg_type == "FeasibilityCheckRequest":
             await self._process_feasibility(raw_message)
+        elif msg_type == "FeasibilityRelease":
+            self.release_hold(intent_id, raw_message.get("attempt", 0))
         elif msg_type == "ServiceOrderRequestDispatch": #
             await self._process_provisioning(raw_message, service_topic)
 
     async def _process_feasibility(self, data):
+        intent_id = data.get("intent_id")
+        # A new attempt for the same intent replaces a previous, not yet provisioned hold.
+        self.release_hold(intent_id, attempt=None)
+
         result = await self.handle_feasibility(data)
-        if not result.ok:
-            log.warning(f"Domain {self._domain_unique_id}: Rejecting {data.get('intent_id')} - {result.reason}")
+        if result.ok:
+            self.hold(intent_id, data.get("attempt", 0), self.resources_for(data))
+        else:
+            log.warning(f"Domain {self._domain_unique_id}: Rejecting {intent_id} - {result.reason}")
         response = {
             "message_type": "FeasibilityCheckResponse",
             "intent_id": data.get("intent_id"),
@@ -205,6 +218,7 @@ class BaseDomainBroker:
         log.info(f"Sent feasibility response to {self._topic_domain_to_idmo}")
 
     async def _process_provisioning(self, data, service_topic):
+        self.confirm(data.get("intent_id"), self.resources_for(data))
         resource_id = await self.handle_provisioning(data)
         activation_report = {
             "message_type": "ServiceChangeStatus",
@@ -283,21 +297,52 @@ class BaseDomainBroker:
 
     # --- Resource accounting -------------------------------------------------------------------
 
-    def reserve(self, intent_id: str, **amounts: float):
-        self._reservations[intent_id] = amounts
+    def hold(self, intent_id: str, attempt: int, amounts: dict):
+        """Reserves resources for a service that passed the feasibility check but is not provisioned yet."""
+        self._reservations[intent_id] = {"amounts": amounts, "attempt": attempt, "confirmed": False,
+                                         "since": time.monotonic()}
+
+    def confirm(self, intent_id: str, amounts: dict):
+        """Turns a hold into a reservation for a provisioned service (or reserves anew if the hold expired)."""
+        entry = self._reservations.get(intent_id)
+        if entry is None:
+            self._reservations[intent_id] = {"amounts": amounts, "attempt": None, "confirmed": True,
+                                             "since": time.monotonic()}
+        else:
+            entry["confirmed"] = True
+
+    def release_hold(self, intent_id: str, attempt: int | None):
+        """Frees a not yet provisioned hold; with an attempt number only if it belongs to that attempt."""
+        entry = self._reservations.get(intent_id)
+        if entry and not entry["confirmed"] and (attempt is None or entry["attempt"] == attempt):
+            del self._reservations[intent_id]
 
     def release(self, intent_id: str):
         self._reservations.pop(intent_id, None)
 
+    def _expire_holds(self):
+        now = time.monotonic()
+        for intent_id, entry in list(self._reservations.items()):
+            if not entry["confirmed"] and now - entry["since"] > self.HOLD_TTL_S:
+                log.warning(f"Domain {self._domain_name}: hold for {intent_id} expired.")
+                del self._reservations[intent_id]
+
     def reserved(self, resource: str) -> float:
-        """Sum of a resource reserved by all active services."""
-        return sum(r.get(resource, 0) for r in self._reservations.values())
+        """Sum of a resource held or reserved by all services."""
+        self._expire_holds()
+        return sum(e["amounts"].get(resource, 0) for e in self._reservations.values())
 
     @property
     def active_services(self) -> int:
+        """Services held or provisioned in this domain."""
+        self._expire_holds()
         return len(self._reservations)
 
     # --- Domain specific logic ------------------------------------------------------------------
+
+    def resources_for(self, data) -> dict:
+        """Resources a service needs in this domain, e.g. {"bandwidth_mhz": 100}; held after a positive feasibility."""
+        return {}
 
     async def handle_feasibility(self, data) -> FeasibilityResult: raise NotImplementedError
     async def handle_provisioning(self, data) -> str: raise NotImplementedError # Returns a resource id

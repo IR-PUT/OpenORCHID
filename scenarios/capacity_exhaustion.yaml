@@ -1,0 +1,55 @@
+# Load balancing until the capacity runs out, and recovery of capacity when services expire.
+name: capacity_exhaustion
+description: Two identical RANs, least-loaded selection; the third intent finds no capacity, a later one fits again.
+
+runtime:
+  duration_s: 60
+
+orchestrator:
+  domain_selection: least_loaded
+  max_candidates: 2
+
+domains:
+  - name: core-1
+    type: core
+    capabilities: { cpu: 16, memory_gb: 64, storage_gb: 500, maxNumberofUEs: 5000 }
+
+  - name: ran-1
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 1000]]
+      positioning: true
+      core_links: { core-1: 5.0 }
+    behavior: { max_bandwidth_mhz: 60 }
+
+  - name: ran-2
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 1000]]
+      positioning: true
+      core_links: { core-1: 5.0 }
+    behavior: { max_bandwidth_mhz: 60 }
+
+intents:
+  # 0: both RANs idle -> ran-1 (registration order breaks the tie).
+  - at_s: 0
+    rfs: { ran: { bandwidth_mhz: 40, tac: 1000, duration_s: 12 }, core: { priority: 1 } }
+  # 1: ran-2 is less loaded -> ran-2.
+  - at_s: 2
+    rfs: { ran: { bandwidth_mhz: 40, tac: 1000, duration_s: 12 }, core: { priority: 1 } }
+  # 2: both RANs have 20 MHz left -> both candidates reject -> REJECTED (proposal: 20 MHz).
+  - at_s: 4
+    rfs: { ran: { bandwidth_mhz: 40, tac: 1000, duration_s: 12 }, core: { priority: 1 } }
+  # 3: intents 0 and 1 have expired and released their bandwidth -> accepted on ran-1.
+  - at_s: 18
+    rfs: { ran: { bandwidth_mhz: 40, tac: 1000, duration_s: 5 }, core: { priority: 1 } }
+
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-1, attempts: 1 }
+  - { intent: 1, final_state: HANDLING_ENDED, ran: ran-2, attempts: 1 }
+  - { intent: 2, final_state: REJECTED, attempts: 2, message_contains: "40 MHz requested, 20 MHz available" }
+  - { intent: 3, final_state: HANDLING_ENDED, ran: ran-1, attempts: 1 }

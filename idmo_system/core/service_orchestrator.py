@@ -165,6 +165,16 @@ class ServiceSaga:
             return
 
         rejected_by = ", ".join(f"{self.selected_domains[k]}: {v}" for k, v in self.attempts[-1]["reasons"].items())
+
+        # Domains that accepted this attempt hold resources for it - let them go.
+        approved = {k: self.selected_domains[k] for k, v in self.feasibility_results.items() if v["status"]}
+        if approved:
+            await self.nc.publish("feasibility.release", json.dumps({
+                "message_type": "FeasibilityRelease",
+                "intent_id": self.intent_id,
+                "attempt": self.attempt,
+                "target_domains": approved
+            }).encode())
         self.attempt += 1
 
         if self.attempt < len(self.candidates):

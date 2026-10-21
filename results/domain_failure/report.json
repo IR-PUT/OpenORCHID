@@ -1,7 +1,7 @@
 {
   "scenario": "domain_failure",
   "passed": true,
-  "elapsed_s": 32.7,
+  "elapsed_s": 32.8,
   "registered_domains": [
     "core-1",
     "ran-a",
@@ -11,7 +11,7 @@
   "missing_domains": [],
   "events": [
     {
-      "t_s": 5.011,
+      "t_s": 5.001,
       "at_s": 5.0,
       "domain": "ran-a",
       "action": "crash",
@@ -19,7 +19,7 @@
       "latency_factor": 1.0
     },
     {
-      "t_s": 5.012,
+      "t_s": 5.002,
       "at_s": 5.0,
       "domain": "ran-c",
       "action": "stop_heartbeat",
@@ -44,8 +44,8 @@
           }
         }
       },
-      "intent_id": "INT-49FED00B",
-      "submitted_at_s": 0.00047770002856850624,
+      "intent_id": "INT-0C747F87",
+      "submitted_at_s": 0.0004026999231427908,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-a",
@@ -65,8 +65,8 @@
       "last_message": "Critical: Domain ran-a lost heartbeat.",
       "history": [
         {
-          "t_s": 2.143,
-          "intent_id": "INT-49FED00B",
+          "t_s": 2.137,
+          "intent_id": "INT-0C747F87",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -85,8 +85,8 @@
           ]
         },
         {
-          "t_s": 11.899,
-          "intent_id": "INT-49FED00B",
+          "t_s": 11.885,
+          "intent_id": "INT-0C747F87",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Critical: Domain ran-a lost heartbeat."
         }
@@ -108,8 +108,8 @@
           }
         }
       },
-      "intent_id": "INT-56B35D06",
-      "submitted_at_s": 0.010691500036045909,
+      "intent_id": "INT-2409DF0B",
+      "submitted_at_s": 0.01156679994892329,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-c",
@@ -129,8 +129,8 @@
       "last_message": "Critical: Domain ran-c lost heartbeat.",
       "history": [
         {
-          "t_s": 4.169,
-          "intent_id": "INT-56B35D06",
+          "t_s": 4.162,
+          "intent_id": "INT-2409DF0B",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -149,14 +149,14 @@
           ]
         },
         {
-          "t_s": 9.182,
+          "t_s": 9.174,
           "message_type": "IntentStatusUpdate",
-          "intent_id": "INT-56B35D06",
+          "intent_id": "INT-2409DF0B",
           "current_handling_state": "STATE_COMPLIES"
         },
         {
-          "t_s": 11.9,
-          "intent_id": "INT-56B35D06",
+          "t_s": 11.885,
+          "intent_id": "INT-2409DF0B",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Critical: Domain ran-c lost heartbeat."
         }
@@ -178,8 +178,8 @@
           }
         }
       },
-      "intent_id": "INT-01F652BA",
-      "submitted_at_s": 18.015788400080055,
+      "intent_id": "INT-3859D1DB",
+      "submitted_at_s": 18.01070779992733,
       "final_state": "HANDLING_ENDED",
       "selected_domains": {
         "ran": "ran-b",
@@ -199,8 +199,8 @@
       "last_message": "Service lifecycle expired and resources released.",
       "history": [
         {
-          "t_s": 20.164,
-          "intent_id": "INT-01F652BA",
+          "t_s": 20.123,
+          "intent_id": "INT-3859D1DB",
           "lifecycle_status": "ACTIVE",
           "message": "Service is fully operational.",
           "selected_domains": {
@@ -219,14 +219,14 @@
           ]
         },
         {
-          "t_s": 25.166,
+          "t_s": 25.136,
           "message_type": "IntentStatusUpdate",
-          "intent_id": "INT-01F652BA",
+          "intent_id": "INT-3859D1DB",
           "current_handling_state": "STATE_COMPLIES"
         },
         {
-          "t_s": 30.206,
-          "intent_id": "INT-01F652BA",
+          "t_s": 30.198,
+          "intent_id": "INT-3859D1DB",
           "current_handling_state": "HANDLING_ENDED",
           "message": "Service lifecycle expired and resources released."
         }

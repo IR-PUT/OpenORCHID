@@ -1,0 +1,44 @@
+# A domain with user-defined logic: `class` points to a broker implemented outside idmo_system
+# (examples/priority_ran.py), `params` are passed to its constructor.
+name: custom_domain
+description: A RAN that keeps 50 MHz for priority-1 services, implemented as a custom broker class.
+
+runtime:
+  duration_s: 60
+
+domains:
+  - name: core-1
+    type: core
+    capabilities: { cpu: 16, memory_gb: 64, storage_gb: 500, maxNumberofUEs: 5000 }
+
+  - name: ran-hospital
+    type: ran
+    class: examples.priority_ran:PriorityRanBroker
+    params: { protected_mhz: 50 }
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 1000]]
+      positioning: true
+      core_links: { core-1: 4.0 }
+    behavior:
+      max_bandwidth_mhz: 100
+
+intents:
+  # 0: 40 MHz of the 50 MHz open to everyone -> accepted.
+  - at_s: 0
+    owner: visitors-wifi
+    rfs: { ran: { bandwidth_mhz: 40, tac: 1000, duration_s: 15 }, core: { priority: 3 } }
+  # 1: 60 MHz are free, but only 10 MHz are open to non-critical services -> REJECTED.
+  - at_s: 2
+    owner: video-archive
+    rfs: { ran: { bandwidth_mhz: 30, tac: 1000, duration_s: 15 }, core: { priority: 2 } }
+  # 2: priority 1 may use the protected part -> accepted.
+  - at_s: 4
+    owner: emergency-team
+    rfs: { ran: { bandwidth_mhz: 50, tac: 1000, duration_s: 15 }, core: { priority: 1 } }
+
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-hospital }
+  - { intent: 1, final_state: REJECTED, attempts: 1, message_contains: "kept for priority-1 services" }
+  - { intent: 2, final_state: HANDLING_ENDED, ran: ran-hospital }
