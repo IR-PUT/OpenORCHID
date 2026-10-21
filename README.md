@@ -159,11 +159,11 @@ print(result.to_dict()["intents"][0]["attempts"])
 
 `docker-compose.yaml` starts Kafka (`broker`, with Kafka UI on port 8080), NATS and Ollama with the `qwen2.5-coder:1.5b` model.
 Kafka, NATS and the LLM are switched independently — in the scenario (`runtime.kafka`, `runtime.nats`, `runtime.llm`)
-or on the command line. For example, real Kafka with in-process NATS and LLM:
+or on the command line. For example, real Kafka and NATS with the in-process (mock) LLM:
 
 ```bash
-docker compose up -d broker
-uv run python -m idmo_system run scenarios/multi_domain.yaml --kafka real
+docker compose up -d broker nats
+uv run python -m idmo_system run scenarios/multi_domain.yaml --kafka real --nats real
 ```
 
 With real Kafka the runner deletes all `unity6g.*` topics before each run, and every domain needs a few seconds until
@@ -177,6 +177,10 @@ The intent gateway (`GET /intents`, `GET /intents/{intent_id}`, `POST /intents`)
 ```bash
 uv run pytest                     # unit tests + every scenario in scenarios/ (~3 min)
 uv run pytest -m "not scenario"   # unit tests only (~1 s)
+
+# every scenario against the docker-compose services (skipped unless OPENORCHID_REAL is set)
+docker compose up -d broker nats
+OPENORCHID_REAL=kafka,nats uv run pytest -m real_infra
 ```
 
 Every file in `scenarios/` must have an `expect` section — adding a scenario adds a test.
@@ -194,8 +198,8 @@ This is a demonstrator, not a production orchestrator:
 - **Simulated domains.** RAN and CORE brokers model capacity and telemetry, they do not control real network functions.
 - **Simplified selection.** Frequency bands, positioning and compute capabilities (CPU, memory) are registered but not
   used in domain selection.
-- **Tested setups:** everything in mock mode, and every scenario with real Kafka. Real NATS and the Ollama LLM have
-  not been re-verified since the scenario-based refactoring.
+- **Tested setups:** every scenario in mock mode and with real Kafka and NATS (separately and together).
+  The Ollama LLM has not been re-verified since the scenario-based refactoring.
 
 ## Architecture at a Glance
 

@@ -125,8 +125,16 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
   - Kafka clients closed on shutdown (`BaseDomainBroker.stop()`, `MessageBusAdapter.stop()`).
 - [x] README: real-infrastructure instructions and a Known Limitations section. Recovery deliberately not implemented.
 
+### Stage 6 — real NATS · branch `refactoring-step-6`
+- [x] All scenarios pass with real NATS (Kafka mocked) and with real NATS + real Kafka — no code changes were needed
+      for NATS semantics (callbacks, request/reply via `_INBOX`, `>` monitor) beyond what the mock already modelled.
+- [x] Runner closes the components' NATS connections at the end of a run (several real-NATS runs in one process
+      no longer leave connections open).
+- [x] `tests/test_real_infra.py` (`-m real_infra`): every scenario in a subprocess against docker-compose services,
+      enabled by `OPENORCHID_REAL=kafka,nats`, skipped otherwise.
+
 ## Possible next steps
 - Recovery: re-provision on the next candidate after domain loss / persistent SLA violation (reuse the retry loop).
-- Verify real NATS and Ollama.
+- Verify Ollama (`--llm ollama`).
 - Strategy plugins from the scenario file (today: register in Python before loading the scenario).
 - A domain re-registering after it was declared lost; distributed mode (domains as separate processes).

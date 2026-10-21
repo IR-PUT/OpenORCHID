@@ -232,6 +232,7 @@ class ScenarioRunner:
         tasks = []
         brokers = {}
         adapter = None
+        components = []
 
         try:
             if rt.kafka == "real":
@@ -319,6 +320,9 @@ class ScenarioRunner:
             await asyncio.gather(*(b.stop() for b in brokers.values()), return_exceptions=True)
             if adapter is not None:
                 await asyncio.gather(adapter.stop(), return_exceptions=True)
+            # NATS connections of the components (with real NATS they would stay open until the process exits)
+            connections = [c.nc for c in [*components, adapter] if c is not None and getattr(c, "nc", None) is not None]
+            await asyncio.gather(*(nc.close() for nc in connections), return_exceptions=True)
             self._close_log_files()
 
     async def _wait_for_registration(self, registry) -> list[str]:

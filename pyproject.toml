@@ -23,4 +23,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["scenario: runs a whole scenario file in mock mode (slow, ~30 s each)"]
+markers = [
+    "scenario: runs a whole scenario file in mock mode (slow, ~30 s each)",
+    "real_infra: runs scenarios against docker-compose services, needs OPENORCHID_REAL=kafka,nats",
+]

@@ -4,7 +4,7 @@ Public **demo** of an IDMO (Inter-Domain Management & Orchestration) system. The
 is a separate, heavily rebuilt codebase (not in this repo). This repo should stay small and readable
 as a showcase: don't over-engineer and don't import concepts from the private version unless asked.
 
-Refactoring history and next steps: `PLAN.md` (stages 0–5 done, one branch per stage `refactoring-step-N`).
+Refactoring history and next steps: `PLAN.md` (stages 0–6 done, one branch per stage `refactoring-step-N`).
 Recovery is intentionally out of scope (listed under Known Limitations in README).
 
 ## Stack / run
@@ -57,8 +57,9 @@ NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `do
 - New consumers need `auto_offset_reset="earliest"` where messages may be produced before the group join completes.
 - Never use autocommit on consumers whose topics can be deleted (aiokafka retries the commit forever, consumer stalls,
   `stop()` hangs). MBA commits manually per message (`TopicPartition`); the mock supports `commit()` too.
-- The mock hides all timing: always re-run scenarios with `--kafka real` after touching messaging code.
+- The mock hides all timing: always re-run `OPENORCHID_REAL=kafka,nats uv run pytest -m real_infra`
+  (needs `docker compose up -d broker nats`) after touching messaging code.
 
 ## Known issues (after Stage 5, 2026-10)
 - See README "Known Limitations" (no recovery, no persistence, single process, simulated domains).
-- Real NATS and Ollama not verified since the refactoring.
+- Ollama not verified since the refactoring (real Kafka + NATS pass: `OPENORCHID_REAL=kafka,nats uv run pytest -m real_infra`).
