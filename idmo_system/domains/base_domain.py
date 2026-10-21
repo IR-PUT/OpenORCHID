@@ -55,11 +55,14 @@ class BaseDomainBroker:
         return task
 
     async def stop(self):
-        """Cancels all background work of the domain (listeners, heartbeats, telemetry)."""
+        """Cancels all background work of the domain (listeners, heartbeats, telemetry) and closes its producer."""
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        if self.producer is not None:
+            producer, self.producer = self.producer, None
+            await producer.stop()
 
     async def apply_event(self, event: DomainEvent):
         """Injects a scenario event (fault) into the domain."""
@@ -103,7 +106,8 @@ class BaseDomainBroker:
             "unity6g.domain.registration.response",
             bootstrap_servers=self.kafka_bootstrap,
             group_id=f"group_{self._temporary_domain_id}",
-            auto_offset_reset='earliest' # Guarantees we do not miss the response
+            auto_offset_reset='earliest', # Guarantees we do not miss the response
+            enable_auto_commit=False # See _subscribe_to_direct_commands
         )
         await consumer.start()
         try:
@@ -165,8 +169,11 @@ class BaseDomainBroker:
             group_id=f"group_{self._domain_unique_id}",
             # The topic is dedicated to this domain and the registry may route requests to it
             # before this consumer starts - read it from the beginning so nothing is missed.
-            auto_offset_reset='earliest'
-        )
+            auto_offset_reset='earliest',
+            # Topics of this domain can be deleted while it runs (e.g. when it is declared lost); with autocommit
+            # the consumer would retry committing to the deleted topic forever and its stop() would hang.
+            enable_auto_commit=False
+)
         await consumer.start()
         log.info(f'Subscribed to direct topic {self._topic_idmo_to_domain}')
 
@@ -247,7 +254,9 @@ class BaseDomainBroker:
         consumer = AIOKafkaConsumer(
             topic_name,
             bootstrap_servers=self.kafka_bootstrap,
-            group_id=f"group_{self._domain_unique_id}_{topic_name}"
+            group_id=f"group_{self._domain_unique_id}_{topic_name}",
+            auto_offset_reset='earliest', # A termination sent while the consumer is still joining must not be lost
+            enable_auto_commit=False # The service topic is deleted after termination
         )
         await consumer.start()
         

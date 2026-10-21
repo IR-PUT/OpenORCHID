@@ -4,7 +4,8 @@ description: One RAN + one CORE domain, a single intent going through the full l
 
 runtime:
   duration_s: 60
-  transport: mock        # mock | real (docker-compose.yaml)
+  kafka: mock            # mock | real (docker-compose.yaml)
+  nats: mock             # mock | real
   llm: mock              # mock | ollama
 
 registry:

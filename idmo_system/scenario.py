@@ -21,11 +21,13 @@ class _StrictModel(BaseModel):
 class RuntimeConfig(_StrictModel):
     duration_s: float = 60.0 # Hard limit of the scenario run, counted from the first intent slot (t=0)
     stop_when_done: bool = True # Finish early once every intent reached a terminal state
-    transport: Literal["mock", "real"] = "mock" # mock = in-process Kafka/NATS, real = docker-compose services
+    kafka: Literal["mock", "real"] = "mock" # mock = in-process, real = broker at kafka_bootstrap (docker-compose.yaml)
+    nats: Literal["mock", "real"] = "mock" # mock = in-process, real = server at nats_url (docker-compose.yaml)
     llm: Literal["mock", "ollama"] = "mock" # mock = answers from `translations`, ollama = real LLM
-    kafka_bootstrap: str = "localhost:9092"
-    nats_url: str = "nats://localhost:4222"
-    llm_address: str = "http://localhost:11434/api/generate"
+    # 127.0.0.1 rather than localhost - avoids slow IPv6 (::1) connection attempts to the docker-compose services
+    kafka_bootstrap: str = "127.0.0.1:9092"
+    nats_url: str = "nats://127.0.0.1:4222"
+    llm_address: str = "http://127.0.0.1:11434/api/generate"
     llm_model: str = "qwen2.5-coder:1.5b"
     gateway_port: int = 8000
     registration_timeout_s: float = 30.0 # How long to wait for all domains to register before t=0

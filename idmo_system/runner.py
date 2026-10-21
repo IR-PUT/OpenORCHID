@@ -5,8 +5,8 @@
     print(result.summary())
     assert result.passed # all `expect` entries matched and all domains registered
 
-Components are imported lazily inside run(), after the Kafka/NATS mocks are installed (transport: mock).
-One process can use only one transport, because the mocks replace aiokafka/nats in sys.modules.
+Components are imported lazily inside run(), after the Kafka/NATS mocks are installed (runtime.kafka / runtime.nats
+set to "mock"). One process can use only one combination, because the mocks replace aiokafka/nats in sys.modules.
 """
 
 import asyncio
@@ -25,18 +25,19 @@ from idmo_system.scenario import ExpectConfig, IntentConfig, Scenario
 
 TERMINAL_HANDLING_STATES = ("HANDLING_ENDED", "REJECTED")
 
-_active_transport = None
+_active_transport = None # (kafka, nats) used by the first run in this process
 
 
-def _prepare_transport(transport: str):
+def _prepare_transport(kafka: str, nats: str):
     global _active_transport
+    transport = (kafka, nats)
     if _active_transport is not None and _active_transport != transport:
-        raise RuntimeError(f"Transport '{_active_transport}' already in use in this process, cannot switch to '{transport}'.")
-    if transport == "mock":
-        from idmo_system import mocks
-        if _active_transport is None:
-            mocks.install(llm=False)
-        mocks.reset()
+        raise RuntimeError(f"Transport kafka={_active_transport[0]}, nats={_active_transport[1]} already in use "
+                           f"in this process, cannot switch to kafka={kafka}, nats={nats}.")
+    from idmo_system import mocks
+    if _active_transport is None:
+        mocks.install(kafka=kafka == "mock", nats=nats == "mock", llm=False)
+    mocks.reset()
     _active_transport = transport
 
 
@@ -209,9 +210,9 @@ class ScenarioRunner:
 
     async def run(self) -> ScenarioResult:
         rt = self.scenario.runtime
-        _prepare_transport(rt.transport)
+        _prepare_transport(rt.kafka, rt.nats)
 
-        # Imported only now, so they bind to the mocked aiokafka/nats when transport is "mock".
+        # Imported only now, so they bind to the mocked aiokafka/nats when set to "mock".
         import nats
         import uvicorn
         from idmo_system.communication.message_bus_adapter import MessageBusAdapter
@@ -225,14 +226,15 @@ class ScenarioRunner:
         from idmo_system.mocks.llm_mock import MockIntentTranslator
 
         log.info(f"SCENARIO: Starting '{self.scenario.name}' "
-                 f"({len(self.scenario.domains)} domains, {len(self.scenario.intents)} intents, transport={rt.transport})")
+                 f"({len(self.scenario.domains)} domains, {len(self.scenario.intents)} intents, kafka={rt.kafka}, nats={rt.nats})")
         self._open_log_files()
         started = time.monotonic()
         tasks = []
         brokers = {}
+        adapter = None
 
         try:
-            if rt.transport == "real":
+            if rt.kafka == "real":
                 await self._cleanup_kafka_topics()
 
             registry = DomainCapabilityRegistration(
@@ -246,7 +248,8 @@ class ScenarioRunner:
                 ServiceOrchestrator(nats_url=rt.nats_url, **self.scenario.orchestrator.model_dump()),
             ]
             tasks += [asyncio.create_task(c.run()) for c in components]
-            tasks.append(asyncio.create_task(MessageBusAdapter(kafka_bootstrap=rt.kafka_bootstrap, nats_url=rt.nats_url).start()))
+            adapter = MessageBusAdapter(kafka_bootstrap=rt.kafka_bootstrap, nats_url=rt.nats_url)
+            tasks.append(asyncio.create_task(adapter.start()))
 
             nc = await nats.connect(rt.nats_url)
             await nc.subscribe("intent.status.update", cb=self._on_intent_update)
@@ -314,6 +317,8 @@ class ScenarioRunner:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             await asyncio.gather(*(b.stop() for b in brokers.values()), return_exceptions=True)
+            if adapter is not None:
+                await asyncio.gather(adapter.stop(), return_exceptions=True)
             self._close_log_files()
 
     async def _wait_for_registration(self, registry) -> list[str]:
@@ -405,7 +410,8 @@ class ScenarioRunner:
         """Writes every Kafka message to kafka.log."""
         from aiokafka import AIOKafkaConsumer
         consumer = AIOKafkaConsumer(bootstrap_servers=self.scenario.runtime.kafka_bootstrap,
-                                    group_id=f"scenario_monitor_{time.time_ns()}", auto_offset_reset="earliest")
+                                    group_id=f"scenario_monitor_{time.time_ns()}", auto_offset_reset="earliest",
+                                    enable_auto_commit=False) # Topics get deleted during the run
         await consumer.start()
         try:
             consumer.subscribe(pattern=".*")

@@ -10,7 +10,7 @@ OpenORCHID - Open version of ORCHestration for Inter-Domain management
 
 OpenORCHID is an event-driven orchestration system for managing multi-domain network services (e.g., RAN and CORE). It combines service lifecycle control via the **Saga pattern**, a **dual-bus (NATS + Kafka) integration layer**, and **LLM-based translation** of natural-language intents into structured service requests.
 
-The whole system — domains, their capabilities and behaviour, the intents and the faults that happen along the way — is described by **scenario files (YAML)**. The same scenario runs fully in-process (mocked Kafka, NATS and LLM) or against real infrastructure, and can carry expectations, which makes it a test.
+The whole system — domains, their capabilities and behaviour, the intents and the faults that happen along the way — is described by **scenario files (YAML)**. The same scenario runs fully in-process (mocked Kafka, NATS and LLM) or against real infrastructure (each of them can be switched separately), and can carry expectations, which makes it a test.
 
 ## Key Ideas
 
@@ -66,7 +66,7 @@ All NATS and Kafka messages, the intent status updates and a `report.json` with 
 
 ```yaml
 name: my-scenario
-runtime: { duration_s: 60, transport: mock, llm: mock }   # transport: real / llm: ollama -> docker compose up -d
+runtime: { duration_s: 60, kafka: mock, nats: mock, llm: mock }   # real / ollama -> docker compose up -d
 orchestrator: { domain_selection: lowest_latency, max_candidates: 3 }
 
 domains:
@@ -97,7 +97,7 @@ expect:
 
 The main sections:
 
-- **`runtime`** — run length, `transport` (`mock` / `real`), `llm` (`mock` / `ollama`), endpoints, `seed`, `output_dir`.
+- **`runtime`** — run length, `kafka` and `nats` (`mock` / `real`), `llm` (`mock` / `ollama`), endpoints, `seed`, `output_dir`.
 - **`orchestrator`** — `domain_selection` strategy, `max_candidates`, `feasibility_timeout_s`.
 - **`registry`** — `heartbeat_interval_s`, `max_missed_heartbeats`.
 - **`domains`** — `capabilities` (what the domain registers with) and `behavior` (capacity, telemetry profile).
@@ -157,13 +157,20 @@ print(result.to_dict()["intents"][0]["attempts"])
 
 ## Running on Real Infrastructure
 
-`docker-compose.yaml` starts Kafka (with Kafka UI on port 8080), NATS and Ollama with the `qwen2.5-coder:1.5b` model:
+`docker-compose.yaml` starts Kafka (`broker`, with Kafka UI on port 8080), NATS and Ollama with the `qwen2.5-coder:1.5b` model.
+Kafka, NATS and the LLM are switched independently — in the scenario (`runtime.kafka`, `runtime.nats`, `runtime.llm`)
+or on the command line. For example, real Kafka with in-process NATS and LLM:
 
 ```bash
-docker compose up -d
+docker compose up -d broker
+uv run python -m idmo_system run scenarios/multi_domain.yaml --kafka real
 ```
 
-Then set `runtime.transport: real` (and `runtime.llm: ollama` for natural-language intents) in the scenario. The intent gateway (`GET /intents`, `GET /intents/{intent_id}`, `POST /intents`) listens on `runtime.gateway_port` (8000) while a scenario runs.
+With real Kafka the runner deletes all `unity6g.*` topics before each run, and every domain needs a few seconds until
+it is UP (the adapter discovers new topics through a metadata refresh every 5 s). The services are reached via
+`127.0.0.1` (not `localhost`, which on some systems resolves to IPv6 first and makes every Kafka connection wait ~20 s).
+
+The intent gateway (`GET /intents`, `GET /intents/{intent_id}`, `POST /intents`) listens on `runtime.gateway_port` (8000) while a scenario runs.
 
 ## Tests
 
@@ -173,6 +180,22 @@ uv run pytest -m "not scenario"   # unit tests only (~1 s)
 ```
 
 Every file in `scenarios/` must have an `expect` section — adding a scenario adds a test.
+
+## Known Limitations
+
+This is a demonstrator, not a production orchestrator:
+
+- **No recovery.** When a domain is lost or the SLA stays violated, the intent ends (the surviving domain releases its
+  resources) — the service is not re-provisioned on another candidate.
+- **No persistence.** The domain registry, the sagas and the intent state repository live in memory; restarting a
+  component loses its state.
+- **A lost domain cannot come back** under the same name during a run (re-registration after a heartbeat loss is not handled).
+- **One process.** All components and simulated domains run in a single process; there is no distributed deployment yet.
+- **Simulated domains.** RAN and CORE brokers model capacity and telemetry, they do not control real network functions.
+- **Simplified selection.** Frequency bands, positioning and compute capabilities (CPU, memory) are registered but not
+  used in domain selection.
+- **Tested setups:** everything in mock mode, and every scenario with real Kafka. Real NATS and the Ollama LLM have
+  not been re-verified since the scenario-based refactoring.
 
 ## Architecture at a Glance
 

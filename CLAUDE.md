@@ -4,16 +4,18 @@ Public **demo** of an IDMO (Inter-Domain Management & Orchestration) system. The
 is a separate, heavily rebuilt codebase (not in this repo). This repo should stay small and readable
 as a showcase: don't over-engineer and don't import concepts from the private version unless asked.
 
-Refactoring history and next steps: `PLAN.md` (stages 0–4 done, one branch per stage `refactoring-step-N`).
+Refactoring history and next steps: `PLAN.md` (stages 0–5 done, one branch per stage `refactoring-step-N`).
+Recovery is intentionally out of scope (listed under Known Limitations in README).
 
 ## Stack / run
 - Python >=3.13, `uv` (package `openorchid`, not installed - run from repo root). Deps: aiokafka, nats-py, fastapi,
   uvicorn, pydantic, aiohttp, loguru, pyyaml; dev: pytest.
 - `uv run python -m idmo_system run scenarios/<file>.yaml` (or `validate`); `run_all.py` = basic scenario.
   Scenario = YAML validated by `idmo_system/scenario.py`; `runner.py` builds everything in one process.
-  `runtime.transport: mock` → `idmo_system.mocks.install()` **patches `sys.modules`** for `aiokafka`/`nats`, so
-  components are imported lazily inside `ScenarioRunner.run()`; one transport per process (`mocks.reset()` between runs).
-  `real` uses `docker-compose.yaml` (Kafka :9092, Kafka UI :8080, NATS :4222, Ollama :11434 `qwen2.5-coder:1.5b`).
+  `runtime.kafka` / `runtime.nats: mock` → `idmo_system.mocks.install()` **patches `sys.modules`** for `aiokafka`/`nats`,
+  so components are imported lazily inside `ScenarioRunner.run()`; one combination per process (`mocks.reset()` between runs).
+  `real` uses `docker-compose.yaml` (Kafka :9092, Kafka UI :8080, NATS :4222, Ollama :11434 `qwen2.5-coder:1.5b`);
+  CLI `--kafka real` etc. Use `127.0.0.1`, not `localhost` (IPv6 delay on Windows). Real Kafka: `docker compose up -d broker`.
   `runtime.llm: mock` → `MockIntentTranslator` with scenario `translations`.
 - Output: `results/<scenario>/{nats,kafka,intents}.log` + `report.json` + summary on stdout (exit 1 if `expect` fails).
 - Custom domain logic: domain `class: package.module:ClassName` + `params` (subclass of RAN/CoreDomainBroker),
@@ -51,7 +53,12 @@ NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `do
 `domain.inventory.query`, `feasibility.check.{request,response}`, `feasibility.release`, `service.order.request.dispatch`, `service.order.terminate`,
 `service.change.status`, `service.telemetry.report`, `monitor.service.{start,stop}`, `sls.violation`, `intent.status.update`, `clean.topics`.
 
-## Known issues (after Stage 4, 2026-10)
-- Recovery is TODO (`process_fault` only logs once the SLA threshold is reached; `_handle_service_recovery` ends the
-  intent and releases the surviving domain). A lost domain cannot re-register under the same name while still in registry.
-- Only tested with mocks; `transport: real` / `llm: ollama` not verified since the refactoring.
+## Real Kafka pitfalls (learned in Stage 5)
+- New consumers need `auto_offset_reset="earliest"` where messages may be produced before the group join completes.
+- Never use autocommit on consumers whose topics can be deleted (aiokafka retries the commit forever, consumer stalls,
+  `stop()` hangs). MBA commits manually per message (`TopicPartition`); the mock supports `commit()` too.
+- The mock hides all timing: always re-run scenarios with `--kafka real` after touching messaging code.
+
+## Known issues (after Stage 5, 2026-10)
+- See README "Known Limitations" (no recovery, no persistence, single process, simulated domains).
+- Real NATS and Ollama not verified since the refactoring.

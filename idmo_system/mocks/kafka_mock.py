@@ -1,5 +1,6 @@
 import asyncio
 import re
+from typing import NamedTuple
 import sys
 import types
 from collections import defaultdict
@@ -11,6 +12,11 @@ class MockNewTopic:
         self.num_partitions = num_partitions
         self.replication_factor = replication_factor
         self.topic_configs = topic_configs or {}
+
+
+class MockTopicPartition(NamedTuple):
+    topic: str
+    partition: int
 
 
 class MockConsumerRecord:
@@ -210,6 +216,9 @@ class MockAIOKafkaConsumer:
             raise StopAsyncIteration
         return await self._queue.get()
 
+    async def commit(self, offsets=None):
+        await asyncio.sleep(0)
+
     async def get_many(self, timeout_ms=0, max_records=None):
         # API compatibility only; the adapter ignores the result.
         if timeout_ms and timeout_ms > 0:
@@ -238,6 +247,7 @@ def install():
     mock_main_mod = types.ModuleType("aiokafka")
     mock_main_mod.AIOKafkaProducer = MockAIOKafkaProducer
     mock_main_mod.AIOKafkaConsumer = MockAIOKafkaConsumer
+    mock_main_mod.TopicPartition = MockTopicPartition
 
     mock_admin_mod = types.ModuleType("aiokafka.admin")
     mock_admin_mod.AIOKafkaAdminClient = MockAIOKafkaAdminClient

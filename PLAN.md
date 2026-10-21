@@ -114,7 +114,19 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
       new scenarios. Domain API: `resources_for()` instead of reserving in `handle_provisioning()`.
 - [x] README rewritten around scenarios; stale `main.py` and `logs/` removed; package renamed `openorchid`.
 
+### Stage 5 — real Kafka · branch `refactoring-step-5`
+- [x] `runtime.transport` split into `runtime.kafka` / `runtime.nats` (mock | real); CLI overrides `--kafka`, `--nats`, `--llm`.
+- [x] All scenarios pass with real Kafka (docker `broker`) + mocked NATS/LLM. Fixes found on the way:
+  - `localhost` → `127.0.0.1` (defaults + Kafka advertised listener): IPv6 `::1` first cost ~21 s per connection on Windows.
+  - Consumers read from `earliest` (MBA pattern consumer, service listeners): a real group join takes seconds and
+    messages produced meanwhile were skipped (registrations never arrived).
+  - Autocommit off everywhere; the MBA commits manually per message. With autocommit, deleting a consumed topic
+    (service cleanup, lost domain) made aiokafka retry the commit forever → consumer stalled, `stop()` hung.
+  - Kafka clients closed on shutdown (`BaseDomainBroker.stop()`, `MessageBusAdapter.stop()`).
+- [x] README: real-infrastructure instructions and a Known Limitations section. Recovery deliberately not implemented.
+
 ## Possible next steps
 - Recovery: re-provision on the next candidate after domain loss / persistent SLA violation (reuse the retry loop).
+- Verify real NATS and Ollama.
 - Strategy plugins from the scenario file (today: register in Python before loading the scenario).
 - A domain re-registering after it was declared lost; distributed mode (domains as separate processes).

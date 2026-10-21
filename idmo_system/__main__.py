@@ -33,7 +33,7 @@ def cmd_validate(args) -> int:
     print(f"  Intents:      {len(scenario.intents)}")
     print(f"  Events:       {len(scenario.events)}")
     print(f"  Expectations: {len(scenario.expect)}")
-    print(f"  Transport:    {scenario.runtime.transport}, LLM: {scenario.runtime.llm}")
+    print(f"  Kafka: {scenario.runtime.kafka}, NATS: {scenario.runtime.nats}, LLM: {scenario.runtime.llm}")
     return 0
 
 
@@ -42,8 +42,9 @@ def cmd_run(args) -> int:
     log.remove()
     log.add(sys.stderr, level=args.log_level)
 
-    if args.output_dir is not None:
-        scenario.runtime.output_dir = args.output_dir
+    for option in ("output_dir", "kafka", "nats", "llm"):
+        if getattr(args, option) is not None:
+            setattr(scenario.runtime, option, getattr(args, option))
 
     from idmo_system.runner import ScenarioRunner
     result = asyncio.run(ScenarioRunner(scenario).run())
@@ -65,6 +66,9 @@ def main() -> int:
     p_run.add_argument("scenario")
     p_run.add_argument("--log-level", default="INFO", help="Console log level (default: INFO)")
     p_run.add_argument("--output-dir", help="Override runtime.output_dir (logs and report.json)")
+    p_run.add_argument("--kafka", choices=["mock", "real"], help="Override runtime.kafka")
+    p_run.add_argument("--nats", choices=["mock", "real"], help="Override runtime.nats")
+    p_run.add_argument("--llm", choices=["mock", "ollama"], help="Override runtime.llm")
     p_run.set_defaults(func=cmd_run)
 
     args = parser.parse_args()

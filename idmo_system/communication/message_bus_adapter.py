@@ -1,7 +1,7 @@
 import json
 import asyncio
 from nats.aio.client import Client as NATS
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from loguru import logger as log
 
@@ -23,7 +23,14 @@ class MessageBusAdapter:
         self.consumer = AIOKafkaConsumer(
             bootstrap_servers=self.kafka_bootstrap,
             group_id="idmo_mba_group",
-            metadata_max_age_ms=5000 
+            metadata_max_age_ms=5000,
+            # Joining the group and discovering pattern-matched topics takes a few seconds on a real broker;
+            # messages produced meanwhile (registrations, first heartbeats) must not be skipped.
+            # Committed offsets of the group still take precedence on restart.
+            auto_offset_reset="earliest",
+            # Topics come and go (services, lost domains). Autocommit retries a commit for a deleted topic forever
+            # and blocks the consumer, so offsets are committed manually, per processed message.
+            enable_auto_commit=False
         )
         await self.consumer.start()
 
@@ -89,6 +96,11 @@ class MessageBusAdapter:
 
             except Exception as e:
                 log.error(f"MBA Error during Kafka-to-NATS translation: {e}")
+
+            try:
+                await self.consumer.commit({TopicPartition(msg.topic, msg.partition): msg.offset + 1})
+            except Exception as e:
+                log.debug(f"MBA: Offset commit for {msg.topic} failed (topic deleted?): {e}")
 
     async def nats_to_kafka_bridge(self):
         registration_ack_sub = await self.nc.subscribe("domain.registration.ack")
@@ -227,6 +239,13 @@ class MessageBusAdapter:
             self.kafka_to_nats_bridge(),
             self.nats_to_kafka_bridge()
         )
+
+    async def stop(self):
+        """Closes the Kafka clients (call after the start() task was cancelled)."""
+        for client in (self.consumer, self.producer):
+            if client is not None:
+                await client.stop()
+        self.consumer = self.producer = None
 
 if __name__ == "__main__":
     mba = MessageBusAdapter()
