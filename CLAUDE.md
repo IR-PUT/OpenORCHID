@@ -4,7 +4,7 @@ Public **demo** of an IDMO (Inter-Domain Management & Orchestration) system. The
 is a separate, heavily rebuilt codebase (not in this repo). This repo should stay small and readable
 as a showcase: don't over-engineer and don't import concepts from the private version unless asked.
 
-Refactoring history and next steps: `PLAN.md` (stages 0–6 done, one branch per stage `refactoring-step-N`).
+Refactoring history and next steps: `PLAN.md` (stages 0–7 done, one branch per stage `refactoring-step-N`).
 Recovery is intentionally out of scope (listed under Known Limitations in README).
 
 ## Stack / run
@@ -62,4 +62,7 @@ NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `do
 
 ## Known issues (after Stage 5, 2026-10)
 - See README "Known Limitations" (no recovery, no persistence, single process, simulated domains).
-- Ollama not verified since the refactoring (real Kafka + NATS pass: `OPENORCHID_REAL=kafka,nats uv run pytest -m real_infra`).
+- Real Kafka + NATS: `OPENORCHID_REAL=kafka,nats uv run pytest -m real_infra`. Ollama: `basic` passes with `--llm ollama`;
+  translation quality via `python -m idmo_system evaluate-llm` (~91% fields with qwen2.5-coder:1.5b). NL scenarios
+  (`multi_domain`) are tuned for the instant mock LLM - with Ollama their timing-dependent expectations differ.
+- Prompt few-shot answers must follow the RFS schema field order (generated from the models; test guards it).

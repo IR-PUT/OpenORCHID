@@ -133,8 +133,19 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - [x] `tests/test_real_infra.py` (`-m real_infra`): every scenario in a subprocess against docker-compose services,
       enabled by `OPENORCHID_REAL=kafka,nats`, skipped otherwise.
 
+### Stage 7 — real LLM (Ollama) · branch `refactoring-step-7`
+- [x] `qwen2.5-coder:1.5b` via docker-compose; `basic` passes on the full real stack (Kafka + NATS + Ollama).
+- [x] Bug: prompt examples listed CORE fields in a different order than the JSON schema the output is constrained to
+      → the model always returned `core.priority = null`. Examples are now serialized from the RFS models
+      (order always matches); regression test in `tests/test_translator.py`. Accuracy 76% → 91% of fields.
+- [x] Translator logs why a translation failed (LLM unreachable, model error, invalid RFS) instead of silently returning None.
+- [x] Runner bug: intents were submitted sequentially, so a slow translation delayed all later intents; now each
+      intent is submitted in its own task at its `at_s`.
+- [x] `python -m idmo_system evaluate-llm` (`gateway/translator_eval.py`): field-level accuracy + latency on fixed sentences.
+- Scenarios with NL intents stay tuned for the instant mock LLM (documented in README).
+
 ## Possible next steps
 - Recovery: re-provision on the next candidate after domain loss / persistent SLA violation (reuse the retry loop).
-- Verify Ollama (`--llm ollama`).
+- A larger LLM / better prompt (measure with `evaluate-llm`); plausibility checks of the translated RFS.
 - Strategy plugins from the scenario file (today: register in Python before loading the scenario).
 - A domain re-registering after it was declared lost; distributed mode (domains as separate processes).

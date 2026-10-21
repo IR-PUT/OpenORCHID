@@ -340,27 +340,30 @@ class ScenarioRunner:
         return missing
 
     async def _submit_intents(self, results: list[IntentResult]):
-        url = f"http://127.0.0.1:{self.scenario.runtime.gateway_port}/intents"
+        # Every intent in its own task: a slow submission (e.g. LLM translation) must not delay the later ones.
         async with aiohttp.ClientSession() as session:
-            for r in sorted(results, key=lambda r: r.config.at_s):
-                await asyncio.sleep(max(0.0, r.config.at_s - self._now_s()))
-                payload = {"intent_owner": r.config.owner}
-                if r.config.rfs is not None:
-                    payload["rfs"] = r.config.rfs.model_dump(exclude_none=True)
-                else:
-                    payload["expression"] = r.config.expression
+            await asyncio.gather(*(self._submit_intent(session, r) for r in results))
 
-                r.submitted_at_s = self._now_s()
-                async with session.post(url, json=payload) as resp:
-                    body = await resp.json()
-                if resp.status == 201:
-                    r.intent_id = body["intent_id"]
-                    r.lifecycle_status = body.get("lifecycle_status")
-                    log.info(f"SCENARIO: Intent #{r.index} submitted as {r.intent_id}")
-                else:
-                    r.error = f"HTTP {resp.status}: {body.get('detail')}"
-                    log.warning(f"SCENARIO: Intent #{r.index} not accepted - {r.error}")
-                self._write_intent_log(f"#{r.index} submitted: {payload} -> {r.intent_id or r.error}")
+    async def _submit_intent(self, session: aiohttp.ClientSession, r: IntentResult):
+        url = f"http://127.0.0.1:{self.scenario.runtime.gateway_port}/intents"
+        await asyncio.sleep(max(0.0, r.config.at_s - self._now_s()))
+        payload = {"intent_owner": r.config.owner}
+        if r.config.rfs is not None:
+            payload["rfs"] = r.config.rfs.model_dump(exclude_none=True)
+        else:
+            payload["expression"] = r.config.expression
+
+        r.submitted_at_s = self._now_s()
+        async with session.post(url, json=payload) as resp:
+            body = await resp.json()
+        if resp.status == 201:
+            r.intent_id = body["intent_id"]
+            r.lifecycle_status = body.get("lifecycle_status")
+            log.info(f"SCENARIO: Intent #{r.index} submitted as {r.intent_id}")
+        else:
+            r.error = f"HTTP {resp.status}: {body.get('detail')}"
+            log.warning(f"SCENARIO: Intent #{r.index} not accepted - {r.error}")
+        self._write_intent_log(f"#{r.index} submitted: {payload} -> {r.intent_id or r.error}")
 
     async def _fire_events(self, brokers: dict):
         for event in sorted(self.scenario.events, key=lambda e: e.at_s):

@@ -2,6 +2,7 @@
 
     python -m idmo_system validate scenarios/basic.yaml
     python -m idmo_system run scenarios/multi_domain.yaml [--log-level DEBUG]
+    python -m idmo_system evaluate-llm [--model qwen2.5-coder:1.5b]
 """
 
 import argparse
@@ -54,6 +55,17 @@ def cmd_run(args) -> int:
     return 0 if result.passed else 1
 
 
+def cmd_evaluate_llm(args) -> int:
+    from idmo_system.gateway.translator import IntentTranslator
+    from idmo_system.gateway.translator_eval import evaluate
+
+    log.remove()
+    log.add(sys.stderr, level="ERROR")
+    print(f"Evaluating {args.model} at {args.llm_address} ...")
+    print(asyncio.run(evaluate(IntentTranslator(llm_address=args.llm_address, model=args.model))))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="python -m idmo_system", description="OpenORCHID scenario runner")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -70,6 +82,11 @@ def main() -> int:
     p_run.add_argument("--nats", choices=["mock", "real"], help="Override runtime.nats")
     p_run.add_argument("--llm", choices=["mock", "ollama"], help="Override runtime.llm")
     p_run.set_defaults(func=cmd_run)
+
+    p_eval = sub.add_parser("evaluate-llm", help="Measure the accuracy of the LLM intent translation (needs Ollama)")
+    p_eval.add_argument("--llm-address", default="http://127.0.0.1:11434/api/generate")
+    p_eval.add_argument("--model", default="qwen2.5-coder:1.5b")
+    p_eval.set_defaults(func=cmd_evaluate_llm)
 
     args = parser.parse_args()
     return args.func(args)

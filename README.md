@@ -172,6 +172,25 @@ it is UP (the adapter discovers new topics through a metadata refresh every 5 s)
 
 The intent gateway (`GET /intents`, `GET /intents/{intent_id}`, `POST /intents`) listens on `runtime.gateway_port` (8000) while a scenario runs.
 
+### LLM (Ollama)
+
+Natural-language intents are translated by the LLM when `runtime.llm: ollama` (or `--llm ollama`) is set:
+
+```bash
+docker compose up -d ollama ollama-model-puller      # downloads qwen2.5-coder:1.5b (~1 GB) on the first start
+uv run python -m idmo_system run scenarios/basic.yaml --llm ollama
+uv run python -m idmo_system evaluate-llm            # translation accuracy on a fixed set of sentences
+```
+
+`evaluate-llm` compares the extracted RFS fields with the expected ones (`--model` to try another model). The small
+default model gets about **90% of the fields** right (31/34, 5 of 8 sentences exactly) at 2–11 s per sentence on a CPU;
+typical mistakes are confusing throughput with bandwidth, missing an informally written tracking area, and inventing
+values that are not in the text. Structured `rfs` intents do not use the LLM at all.
+
+The example scenarios are tuned for the mock LLM, which answers instantly: with a real LLM a translated intent reaches
+the orchestrator only after the translation (several seconds), so timing-dependent expectations — e.g. in
+`multi_domain` — can differ, and the sentence meant to fail translation gets "translated". `basic` passes end-to-end.
+
 ## Tests
 
 ```bash
@@ -198,8 +217,10 @@ This is a demonstrator, not a production orchestrator:
 - **Simulated domains.** RAN and CORE brokers model capacity and telemetry, they do not control real network functions.
 - **Simplified selection.** Frequency bands, positioning and compute capabilities (CPU, memory) are registered but not
   used in domain selection.
-- **Tested setups:** every scenario in mock mode and with real Kafka and NATS (separately and together).
-  The Ollama LLM has not been re-verified since the scenario-based refactoring.
+- **Tested setups:** every scenario in mock mode and with real Kafka and NATS (separately and together);
+  the Ollama LLM end-to-end with `basic` and with `evaluate-llm`.
+- **Small LLM.** The default 1.5B model mistranslates roughly every tenth field (see [LLM (Ollama)](#llm-ollama));
+  the translated RFS is validated, but not checked for plausibility.
 
 ## Architecture at a Glance
 
