@@ -5,8 +5,9 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from loguru import logger as log
 
 class BaseDomainBroker:
-    def __init__(self, domain_type, domain_name=None, kafka_bootstrap="localhost:9092"):
+    def __init__(self, domain_type, capabilities: dict, domain_name=None, kafka_bootstrap="localhost:9092"):
         self._domain_type = domain_type
+        self.capabilities = capabilities
         # Domain name must be unique - the registry derives the domain ID (and Kafka topics) from it.
         self._domain_name = domain_name or f"{domain_type}-{uuid.uuid4().hex[:6]}"
         self.kafka_bootstrap = kafka_bootstrap
@@ -18,6 +19,13 @@ class BaseDomainBroker:
         
         self._temporary_domain_id = f"temp_{domain_type}_{uuid.uuid4().hex[:6]}"
         self.producer = None
+
+    @property
+    def domain_name(self) -> str:
+        return self._domain_name
+
+    async def start(self):
+        await self.run(self.capabilities)
 
     async def run(self, capabilities):
         self.producer = AIOKafkaProducer(bootstrap_servers=self.kafka_bootstrap)
@@ -109,7 +117,10 @@ class BaseDomainBroker:
         consumer = AIOKafkaConsumer(
             self._topic_idmo_to_domain,
             bootstrap_servers=self.kafka_bootstrap,
-            group_id=f"group_{self._domain_unique_id}"
+            group_id=f"group_{self._domain_unique_id}",
+            # The topic is dedicated to this domain and the registry may route requests to it
+            # before this consumer starts - read it from the beginning so nothing is missed.
+            auto_offset_reset='earliest'
         )
         await consumer.start()
         log.info(f'Subscribed to direct topic {self._topic_idmo_to_domain}')

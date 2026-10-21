@@ -168,6 +168,11 @@ async def _mock_connect(servers, **kwargs):
     return client
 
 
+def reset():
+    """Drop all subscriptions (e.g. between two scenario runs in one process)."""
+    MockNATSClient.storage.clear()
+
+
 def install():
     """Replace the nats modules in sys.modules with in-process mocks.
 

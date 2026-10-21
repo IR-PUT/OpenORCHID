@@ -30,14 +30,58 @@ OpenORCHID is an event-driven orchestration system for managing multi-domain net
 
 ## Getting Started
 
-```bash
-# Run the full demo (startup, simulation, event monitoring).
-# By default it uses in-process mocks of Kafka, NATS and the LLM - no infrastructure needed.
-uv run python run_all.py
+The system is driven by **scenario files** (YAML) describing the domains (capabilities and behaviour),
+the intents to submit and the runtime settings. See [`scenarios/`](scenarios/) for examples.
 
-# To run against real infrastructure (Kafka, NATS, Ollama, Kafka UI),
-# set USE_MOCKS = False in run_all.py and bring up the services first:
-docker compose up -d
+```bash
+# Check a scenario file
+uv run python -m idmo_system validate scenarios/multi_domain.yaml
+
+# Run it - by default with in-process mocks of Kafka, NATS and the LLM, no infrastructure needed
+uv run python -m idmo_system run scenarios/multi_domain.yaml
+
+# The original single-intent demo (same as: run scenarios/basic.yaml)
+uv run python run_all.py
 ```
 
-Runtime traces and monitoring output are written to `logs/` and `results/`. API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).
+At the end the runner prints a summary of every intent, e.g.:
+
+```
+ #   at_s  intent_id     final state        SLA       last message
+ 0    0.0  INT-E9961BF2  HANDLING_ENDED     -         Service lifecycle expired and resources released.
+ 1    2.0  INT-AECFC220  REJECTED           -         Feasibility check failed in at least one domain.
+ 2    4.0  INT-1139EDE9  HANDLING_ENDED     degraded  Service lifecycle expired and resources released.
+ 3    6.0  -             SUBMISSION_FAILED  -         HTTP 422: Translation Error: Translator returned no data for the given expression.
+```
+
+A minimal scenario:
+
+```yaml
+name: my-scenario
+runtime: { duration_s: 60, transport: mock, llm: mock }   # transport: real / llm: ollama -> docker compose up -d
+domains:
+  - name: ran-1
+    type: ran
+    capabilities: { maxNumberofUEs: 100, nROperatingBands: [n78], coverageAreaTAList: [[260, 1, 100]], positioning: true }
+    behavior: { max_bandwidth_mhz: 400, telemetry: { interval_s: 5, throughput_mbps: 80, latency_ms: 10 } }
+  - name: core-1
+    type: core
+    capabilities: { cpu: 8, memory_gb: 16, storage_gb: 100, maxNumberofUEs: 5000 }
+intents:
+  - at_s: 0
+    rfs: { ran: { bandwidth_mhz: 100, latency_ms: 20, duration_s: 20 }, core: { priority: 1 } }
+```
+
+Scenarios can also be run from Python:
+
+```python
+import asyncio
+
+from idmo_system.scenario import Scenario
+from idmo_system.runner import ScenarioRunner
+
+result = asyncio.run(ScenarioRunner(Scenario.from_yaml("scenarios/basic.yaml")).run())
+print(result.summary())
+```
+
+Runtime traces (all NATS and Kafka messages, intent updates) are written to `results/<scenario name>/`. API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).

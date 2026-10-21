@@ -1,0 +1,85 @@
+# Several RAN profiles and two CORE domains, intents with different requirements.
+# NOTE: until capability-based domain selection is implemented (PLAN.md, Stage 2),
+# the orchestrator picks the first available RAN and CORE.
+name: multi_domain
+description: URBAN / RURAL / SUBURBAN RAN profiles, two CORE domains, accepted, rejected and degraded intents.
+
+runtime:
+  duration_s: 90
+
+registry:
+  heartbeat_interval_s: 5
+  max_missed_heartbeats: 3
+
+domains:
+  - name: core-central
+    type: core
+    capabilities: { cpu: 64, memory_gb: 256, storage_gb: 2000, maxNumberofUEs: 20000 }
+
+  - name: core-edge
+    type: core
+    capabilities: { cpu: 16, memory_gb: 64, storage_gb: 500, maxNumberofUEs: 5000 }
+
+  - name: ran-urban
+    type: ran
+    capabilities:
+      maxNumberofUEs: 1000
+      nROperatingBands: [n78, n258]
+      coverageAreaTAList: [[260, 6, 1000], [260, 6, 2000]]
+      positioning: true
+      core_links: { core-central: 8.0, core-edge: 2.0 }
+    behavior:
+      max_bandwidth_mhz: 400
+      telemetry: { interval_s: 2, throughput_mbps: 90, latency_ms: 8 }
+
+  - name: ran-rural
+    type: ran
+    capabilities:
+      maxNumberofUEs: 200
+      nROperatingBands: [n28, n1]
+      coverageAreaTAList: [[260, 6, 3000]]
+      positioning: false
+      core_links: { core-central: 35.0 }
+    behavior:
+      max_bandwidth_mhz: 40
+      telemetry: { interval_s: 2, throughput_mbps: 20, latency_ms: 30 }
+
+  - name: ran-suburban
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78, n1]
+      coverageAreaTAList: [[260, 6, 2000], [260, 6, 4000]]
+      positioning: true
+      core_links: { core-central: 15.0, core-edge: 6.0 }
+    behavior:
+      max_bandwidth_mhz: 100
+      telemetry: { interval_s: 2, throughput_mbps: 60, latency_ms: 15 }
+
+intents:
+  # Natural language, translated by the (mock) LLM using `translations` below.
+  - at_s: 0
+    owner: factory-operator
+    expression: Low-latency slice for robots in TA 1000 for 15 seconds, 100 MHz, latency under 10 ms.
+
+  # Structured requests bypass the LLM.
+  - at_s: 2
+    owner: video-streaming
+    rfs:
+      ran: { bandwidth_mhz: 1000, tac: 2000, duration_s: 15 }   # more than any RAN offers -> REJECTED
+      core: { priority: 3 }
+
+  - at_s: 4
+    owner: stadium-event
+    rfs:
+      ran: { bandwidth_mhz: 200, throughput_mbps: 150, tac: 1000, duration_s: 15 }   # telemetry below target -> STATE_DEGRADES
+      core: { priority: 1, latency_ms: 20 }
+
+  - at_s: 6
+    owner: unknown-user
+    expression: Something the mock LLM does not know.   # translation fails -> SUBMISSION_FAILED
+
+translations:
+  "Low-latency slice for robots in TA 1000 for 15 seconds, 100 MHz, latency under 10 ms.":
+    ran: { bandwidth_mhz: 100, latency_ms: 10, tac: 1000, duration_s: 15 }
+    core: { priority: 1, latency_ms: 5 }

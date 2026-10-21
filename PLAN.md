@@ -65,12 +65,17 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - [x] Mocks enabled explicitly (`idmo_system.mocks.install()`), not as an import side effect; unused `mock_broker.py` removed.
 - [x] Demo intent has a short duration so the full lifecycle (incl. decommissioning) is visible in 60 s.
 
-### Stage 1 — scenario model + runner
-- `idmo_system/scenario.py`: pydantic models for the whole file, clear validation errors.
-- `idmo_system/runner.py`: `ScenarioRunner(scenario).run()` — builds components, starts N domains,
-  submits intents at `at_s`, fires events, collects intent status.
-- CLI (`run`, `validate`); `run_all.py` becomes a thin wrapper over `scenarios/basic.yaml`.
-- Generic `RanDomainBroker` / `CoreDomainBroker` driven by config (capabilities + behaviour).
+### Stage 1 — scenario model + runner · branch `refactoring-step-1`
+- [x] `idmo_system/scenario.py`: pydantic models for the whole file (`extra="forbid"` → typos reported with path),
+      cross-checks (unique domain names, `core_links` refer to existing CORE domains).
+- [x] `idmo_system/runner.py`: `ScenarioRunner(scenario).run()` → `ScenarioResult` — builds components, starts N domains,
+      waits for registration (t=0), submits intents at `at_s` via the gateway HTTP API, tracks `intent.status.update`,
+      stops at `duration_s` or when all intents are terminal; logs to `results/<scenario>/{nats,kafka,intents}.log`.
+- [x] CLI `python -m idmo_system run|validate <file>`; `run_all.py` is a thin wrapper over `scenarios/basic.yaml`.
+- [x] `RANDomainBroker` / `CoreDomainBroker` take capabilities + behaviour (`domains/behavior.py`).
+- [x] Gateway accepts structured `rfs` (bypasses the LLM); mock LLM translations can be defined in the scenario.
+- [x] Scenarios: `basic.yaml`, `multi_domain.yaml`.
+- Events (fault injection) moved to Stage 3, where the behaviours they trigger are implemented.
 
 ### Stage 2 — capability-driven decisions
 - Domain-side feasibility from capabilities + current load (reserve on provisioning, release on termination);

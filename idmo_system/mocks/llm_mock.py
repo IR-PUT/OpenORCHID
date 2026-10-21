@@ -22,11 +22,25 @@ MOCK_TRANSLATIONS = {
 }
 
 
+class MockIntentTranslator:
+    """Drop-in replacement for IntentTranslator answering from a fixed expression -> RFS table."""
+
+    def __init__(self, translations: dict[str, dict | ResourceFacingService] | None = None):
+        self._translations = dict(MOCK_TRANSLATIONS)
+        for expression, rfs in (translations or {}).items():
+            if isinstance(rfs, ResourceFacingService):
+                rfs = rfs.model_dump()
+            self._translations[_normalize_expression(expression)] = rfs
+
+    async def translate_to_rfs(self, expression: str) -> dict | None:
+        translation = self._translations.get(_normalize_expression(expression))
+        if translation is None:
+            return None
+        return ResourceFacingService(**translation).model_dump()
+
+
 async def _mock_translate_to_rfs(self, expression: str) -> dict | None:
-    translation = MOCK_TRANSLATIONS.get(_normalize_expression(expression))
-    if translation is None:
-        return None
-    return ResourceFacingService(**translation).model_dump()
+    return await MockIntentTranslator().translate_to_rfs(expression)
 
 
 def install():

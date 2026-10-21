@@ -1,0 +1,33 @@
+# The original demo: one RAN, one CORE, one natural-language intent with a 20 s lifetime.
+name: basic
+description: One RAN + one CORE domain, a single intent going through the full lifecycle.
+
+runtime:
+  duration_s: 60
+  transport: mock        # mock | real (docker-compose.yaml)
+  llm: mock              # mock | ollama
+
+registry:
+  heartbeat_interval_s: 10
+  max_missed_heartbeats: 3
+
+domains:
+  - name: ran-1
+    type: ran
+    capabilities:
+      maxNumberofUEs: 100
+      nROperatingBands: [n78, n258]
+      coverageAreaTAList: [[260, 1, 100]]   # (mcc, mnc, tac)
+      positioning: true
+      core_links: { core-1: 10.0 }          # CORE domain -> link latency [ms]
+    behavior:
+      max_bandwidth_mhz: 4000
+      telemetry: { interval_s: 5, throughput_mbps: 85.5, latency_ms: 12.0 }
+
+  - name: core-1
+    type: core
+    capabilities: { cpu: 8, memory_gb: 16, storage_gb: 100, maxNumberofUEs: 5000 }
+
+intents:
+  - at_s: 0
+    expression: Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.

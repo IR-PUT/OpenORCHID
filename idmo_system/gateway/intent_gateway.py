@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from datetime import datetime, timezone
 from loguru import logger as log
 
+from idmo_system.communication.api import ResourceFacingService
 from idmo_system.gateway.translator import IntentTranslator
 
 
@@ -54,6 +55,9 @@ def create_app(nats_url: str = "nats://localhost:4222", translator: IntentTransl
     @app.post("/intents", status_code=201)
     async def create_intent(payload: dict, request: Request):
         """
+        Payload: {"expression": "<natural language>"} and/or {"rfs": {"ran": {...}, "core": {...}}},
+        optional "intent_owner". A structured "rfs" bypasses the Translator.
+
         1. Generates a unique intent_id.
         2. Directly invokes the Translator (LLM) to map natural language to RFS.
         3. Publishes ServiceOrderRequest (containing RAN & Core RFS) to the Saga.
@@ -66,10 +70,11 @@ def create_app(nats_url: str = "nats://localhost:4222", translator: IntentTransl
         # Creating a traceable ID used across Saga, Kafka, and Databases
         intent_id = f"INT-{uuid.uuid4().hex[:8].upper()}"
         expression = payload.get("expression")
+        structured_rfs = payload.get("rfs")
         owner = payload.get("intent_owner", "Anonymous")
 
-        if not expression:
-            raise HTTPException(status_code=400, detail="Intent expression is required")
+        if not expression and not structured_rfs:
+            raise HTTPException(status_code=400, detail="Intent expression or rfs is required")
 
         # --- STEP 2: Initialize record in Intent State Repository (ISR) ---
         # Providing immediate visibility for the Intent Owner
@@ -85,7 +90,10 @@ def create_app(nats_url: str = "nats://localhost:4222", translator: IntentTransl
         # --- STEP 3: Direct Translator (LLM) Invocation ---
         # The Translator extracts technical parameters for both network domains
         try:
-            rfs_data = await state.translator.translate_to_rfs(expression)
+            if structured_rfs is not None:
+                rfs_data = ResourceFacingService.model_validate(structured_rfs).model_dump()
+            else:
+                rfs_data = await state.translator.translate_to_rfs(expression)
             if rfs_data is None:
                 raise ValueError("Translator returned no data for the given expression.")
         except Exception as e:

@@ -225,6 +225,11 @@ class MockAIOKafkaConsumer:
         return await self.getone()
 
 
+def reset():
+    """Forget all topics, messages and consumers (e.g. between two scenario runs in one process)."""
+    _BROKER.__init__()
+
+
 def install():
     """Replace the aiokafka modules in sys.modules with in-process mocks.
 

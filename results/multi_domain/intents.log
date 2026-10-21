@@ -1,0 +1,18 @@
+10:25:37 | #0 submitted: {'intent_owner': 'factory-operator', 'expression': 'Low-latency slice for robots in TA 1000 for 15 seconds, 100 MHz, latency under 10 ms.'} -> INT-E9961BF2
+10:25:39 | #1 submitted: {'intent_owner': 'video-streaming', 'rfs': {'ran': {'bandwidth_mhz': 1000.0, 'tac': 2000, 'duration_s': 15.0}, 'core': {'priority': 3}}} -> INT-AECFC220
+10:25:41 | #2 submitted: {'intent_owner': 'stadium-event', 'rfs': {'ran': {'bandwidth_mhz': 200.0, 'throughput_mbps': 150.0, 'tac': 1000, 'duration_s': 15.0}, 'core': {'priority': 1, 'latency_ms': 20.0}}} -> INT-1139EDE9
+10:25:43 | #3 submitted: {'intent_owner': 'unknown-user', 'expression': 'Something the mock LLM does not know.'} -> HTTP 422: Translation Error: Translator returned no data for the given expression.
+10:25:44 | INT-AECFC220 update: {'intent_id': 'INT-AECFC220', 'current_handling_state': 'REJECTED', 'message': 'Feasibility check failed in at least one domain.', 'proposals': {'ran': {'bandwidth_mhz': 400.0}, 'core': None}}
+10:25:46 | INT-E9961BF2 update: {'intent_id': 'INT-E9961BF2', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.'}
+10:25:48 | INT-E9961BF2 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-E9961BF2', 'current_handling_state': 'STATE_COMPLIES'}
+10:25:48 | INT-1139EDE9 update: {'intent_id': 'INT-1139EDE9', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.'}
+10:25:50 | INT-1139EDE9 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-1139EDE9', 'current_handling_state': 'STATE_DEGRADES'}
+10:26:01 | INT-E9961BF2 update: {'intent_id': 'INT-E9961BF2', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+10:26:03 | INT-1139EDE9 update: {'intent_id': 'INT-1139EDE9', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+10:26:03 | Scenario 'multi_domain' finished after 26.5s
+Registered domains: core-central, core-edge, ran-urban, ran-rural, ran-suburban
+ #   at_s  intent_id     final state        SLA       last message
+ 0    0.0  INT-E9961BF2  HANDLING_ENDED     -         Service lifecycle expired and resources released.
+ 1    2.0  INT-AECFC220  REJECTED           -         Feasibility check failed in at least one domain.
+ 2    4.0  INT-1139EDE9  HANDLING_ENDED     degraded  Service lifecycle expired and resources released.
+ 3    6.0  -             SUBMISSION_FAILED  -         HTTP 422: Translation Error: Translator returned no data for the given expression.

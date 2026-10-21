@@ -5,6 +5,13 @@ any idmo_system module that uses aiokafka or nats.
 """
 
 
+def reset():
+    """Clear the state of the Kafka and NATS mocks."""
+    from idmo_system.mocks import kafka_mock, nats_mock
+    kafka_mock.reset()
+    nats_mock.reset()
+
+
 def install(kafka: bool = True, nats: bool = True, llm: bool = True):
     if kafka:
         from idmo_system.mocks import kafka_mock
