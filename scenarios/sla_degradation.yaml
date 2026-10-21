@@ -1,0 +1,62 @@
+# Telemetry profiles and injected degradation, observed by the SLA monitor.
+name: sla_degradation
+description: A RAN that slowly degrades, one hit by a temporary degradation event, and a noisy but compliant one.
+
+runtime:
+  duration_s: 60
+  seed: 7                            # reproducible "random" telemetry
+
+domains:
+  - name: core-1
+    type: core
+    capabilities: { cpu: 16, memory_gb: 64, storage_gb: 500, maxNumberofUEs: 5000 }
+
+  - name: ran-aging                  # loses 10% throughput (and gains latency) with every report
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 1000]]
+      positioning: true
+      core_links: { core-1: 5.0 }
+    behavior:
+      telemetry: { interval_s: 1, profile: degrading, degradation_per_report: 0.1, throughput_mbps: 100, latency_ms: 10 }
+
+  - name: ran-event                  # stable, but degraded by an event between 5 s and 10 s
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 2000]]
+      positioning: true
+      core_links: { core-1: 5.0 }
+    behavior:
+      telemetry: { interval_s: 1, throughput_mbps: 100, latency_ms: 10 }
+
+  - name: ran-noisy                  # +/-10% around values that stay within the SLA
+    type: ran
+    capabilities:
+      maxNumberofUEs: 500
+      nROperatingBands: [n78]
+      coverageAreaTAList: [[260, 6, 3000]]
+      positioning: true
+      core_links: { core-1: 5.0 }
+    behavior:
+      telemetry: { interval_s: 1, profile: random, jitter: 0.1, throughput_mbps: 100, latency_ms: 10 }
+
+intents:
+  - at_s: 0
+    rfs: { ran: { throughput_mbps: 80, latency_ms: 20, tac: 1000, duration_s: 15 }, core: { priority: 1 } }
+  - at_s: 0
+    rfs: { ran: { throughput_mbps: 80, latency_ms: 20, tac: 2000, duration_s: 15 }, core: { priority: 1 } }
+  - at_s: 0
+    rfs: { ran: { throughput_mbps: 80, latency_ms: 20, tac: 3000, duration_s: 15 }, core: { priority: 1 } }
+
+events:
+  - { at_s: 5, domain: ran-event, action: degrade, throughput_factor: 0.5, latency_factor: 3.0 }
+  - { at_s: 10, domain: ran-event, action: restore }
+
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-aging, sla_degraded: true }
+  - { intent: 1, final_state: HANDLING_ENDED, ran: ran-event, sla_degraded: true }
+  - { intent: 2, final_state: HANDLING_ENDED, ran: ran-noisy, sla_degraded: false }

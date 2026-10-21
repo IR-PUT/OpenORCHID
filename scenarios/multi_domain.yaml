@@ -101,6 +101,14 @@ intents:
     owner: unknown-user
     expression: Something the mock LLM does not know.
 
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-urban, core: core-edge, attempts: 1, sla_degraded: false }
+  - { intent: 1, final_state: REJECTED, attempts: 4, message_contains: "1000 MHz requested" }
+  - { intent: 2, final_state: HANDLING_ENDED, ran: ran-urban, core: core-edge, sla_degraded: true }
+  - { intent: 3, final_state: HANDLING_ENDED, ran: ran-suburban, core: core-central, attempts: 4 }
+  - { intent: 4, final_state: REJECTED, attempts: 0, message_contains: "No UP RAN/CORE pair" }
+  - { intent: 5, final_state: SUBMISSION_FAILED }
+
 translations:
   "Low-latency slice for robots in TA 1000 for 20 seconds, 100 MHz, latency under 10 ms.":
     ran: { bandwidth_mhz: 100, latency_ms: 10, tac: 1000, duration_s: 20 }

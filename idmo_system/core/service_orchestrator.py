@@ -240,7 +240,9 @@ class ServiceSaga:
             log.info(f"Saga {self.intent_id}: Monitoring situation... (Temporary fluctuation?)")
             return
 
-        log.critical(f"Saga {self.intent_id}: SLS threshold exceeded consistently. Triggering RECOVERY!")
+        if self.fault_count == self.MAX_FAULT_THRESHOLD:
+            # TODO: recovery (e.g. re-provisioning on the next candidate) is not implemented yet.
+            log.critical(f"Saga {self.intent_id}: SLS threshold exceeded consistently. Recovery needed!")
 
 class ServiceOrchestrator:
     def __init__(self, nats_url="nats://localhost:4222", domain_selection="first_available",
@@ -392,6 +394,18 @@ class ServiceOrchestrator:
         # TODO: recovery (re-provisioning on another domain) is not implemented yet.
         await self.nc.publish("monitor.service.stop", json.dumps({"intent_id": intent_id}).encode())
 
+        # Release the service in the domain that is still alive.
+        saga = self.active_sagas.get(intent_id)
+        if saga is not None and saga.service_topic is not None:
+            await self.nc.publish("service.order.terminate", json.dumps({
+                "message_type": "ServiceTermination",
+                "intent_id": intent_id,
+                "service_topic": saga.service_topic,
+                "target_domains": saga.selected_domains,
+                "reason": f"Domain {lost_domain_id} lost"
+            }).encode())
+            asyncio.create_task(self._cleanup_topics_later([saga.service_topic]))
+
         report = {
             "intent_id": intent_id,
             "current_handling_state": "HANDLING_ENDED",  
@@ -401,6 +415,11 @@ class ServiceOrchestrator:
         
         if intent_id in self.active_sagas:
             del self.active_sagas[intent_id]
+
+    async def _cleanup_topics_later(self, topics, delay_s=5.0):
+        """Deletes topics after the remaining domains had time to read the last messages."""
+        await asyncio.sleep(delay_s)
+        await self.nc.publish("clean.topics", json.dumps({"topics": topics}).encode())
 
     async def handle_fault_alerts(self, msg):
         data = json.loads(msg.data.decode())

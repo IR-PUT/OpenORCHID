@@ -1,9 +1,10 @@
 import asyncio
 import json
+import random
 
 from idmo_system.communication.api import UnityRanCapabilities
 from idmo_system.domains.base_domain import BaseDomainBroker, FeasibilityResult
-from idmo_system.domains.behavior import RanBehavior
+from idmo_system.domains.behavior import DomainEvent, RanBehavior
 from loguru import logger
 
 DEFAULT_RAN_CAPABILITIES = UnityRanCapabilities(
@@ -17,11 +18,45 @@ DEFAULT_RAN_CAPABILITIES = UnityRanCapabilities(
 
 class RANDomainBroker(BaseDomainBroker):
     def __init__(self, domain_name=None, capabilities: UnityRanCapabilities = DEFAULT_RAN_CAPABILITIES,
-                 behavior: RanBehavior | None = None, kafka_bootstrap="localhost:9092"):
+                 behavior: RanBehavior | None = None, kafka_bootstrap="localhost:9092", seed=None):
         super().__init__(domain_type="ran", capabilities=capabilities.model_dump(),
                          domain_name=domain_name, kafka_bootstrap=kafka_bootstrap)
         self.behavior = behavior or RanBehavior()
         self._telemetry_tasks = {}
+        self._rng = random.Random(seed) # "random" telemetry profile
+        # Multipliers set by "degrade" / "restore" events
+        self._throughput_factor = 1.0
+        self._latency_factor = 1.0
+
+    async def apply_event(self, event: DomainEvent):
+        if event.action == "degrade":
+            logger.warning(f"RAN {self.domain_name}: EVENT degrade (throughput x{event.throughput_factor}, "
+                           f"latency x{event.latency_factor})")
+            self._throughput_factor = event.throughput_factor
+            self._latency_factor = event.latency_factor
+        elif event.action == "restore":
+            logger.warning(f"RAN {self.domain_name}: EVENT restore")
+            self._throughput_factor = self._latency_factor = 1.0
+        else:
+            await super().apply_event(event)
+
+    def compute_metrics(self, report_number: int) -> dict:
+        """Telemetry of the n-th report (0-based) of a service, according to the configured profile."""
+        t = self.behavior.telemetry
+        throughput, latency = t.throughput_mbps, t.latency_ms
+
+        if t.profile == "random":
+            throughput *= 1 + self._rng.uniform(-t.jitter, t.jitter)
+            latency *= 1 + self._rng.uniform(-t.jitter, t.jitter)
+        elif t.profile == "degrading":
+            quality = (1 - t.degradation_per_report) ** report_number
+            throughput *= quality
+            latency /= quality
+
+        return {
+            "throughput_mbps": round(throughput * self._throughput_factor, 2),
+            "latency_ms": round(latency * self._latency_factor, 2)
+        }
 
     async def handle_feasibility(self, data):
         rfs = data.get("rfs_ran") or {}
@@ -56,17 +91,16 @@ class RANDomainBroker(BaseDomainBroker):
         intent_id = data.get("intent_id")
         
         logger.info(f"RAN: Starting telemetry for {intent_id}")
-        task = asyncio.create_task(self._telemetry_loop(service_topic, interval, intent_id))
+        task = self._spawn(self._telemetry_loop(service_topic, interval, intent_id))
         self._telemetry_tasks[service_topic] = task
 
     async def _telemetry_loop(self, topic_name, interval, intent_id):
+        report_number = 0
         while True:
             await asyncio.sleep(interval)
-            
-            metrics = {
-                "throughput_mbps": self.behavior.telemetry.throughput_mbps,
-                "latency_ms": self.behavior.telemetry.latency_ms
-            }
+
+            metrics = self.compute_metrics(report_number)
+            report_number += 1
             
             payload = {
                 "message_type": "ServiceTelemetryReport",

@@ -31,3 +31,6 @@ domains:
 intents:
   - at_s: 0
     expression: Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.
+
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-1, core: core-1 }

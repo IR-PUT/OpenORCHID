@@ -92,13 +92,21 @@ domains, rejection reasons, SLA violations); non-zero exit code when an `expect`
 - Known limitation: resources are reserved at provisioning, not at feasibility — two sagas checking the same
   domain at the same moment may overbook it.
 
-### Stage 3 — behaviours and results
-- Telemetry profiles (`constant`, `random`, `degrading`), fault injection (`stop_heartbeat`, `crash`, `degrade`).
-- Report: JSON + console summary table.
-- `expect` assertions; pytest running every scenario in mock mode (first tests in the repo).
+### Stage 3 — behaviours and results · branch `refactoring-step-3`
+- [x] Telemetry profiles (`constant`, `random` with `jitter` + `runtime.seed`, `degrading`) in `TelemetryConfig`.
+- [x] Fault injection: scenario `events` (`stop_heartbeat`, `crash`, `degrade`, `restore`) → `broker.apply_event()`.
+      Domain brokers track their tasks (`_spawn`/`stop()`); the runner stops all domains at the end.
+- [x] On domain loss the orchestrator terminates the service in the surviving domain (releases its resources).
+- [x] Report: `results/<scenario>/report.json` + console summary (events, expectations, PASSED/FAILED).
+- [x] `expect` assertions (`final_state`, `ran`, `core`, `attempts`, `sla_degraded`, `message_contains`);
+      CLI exits 1 on failure.
+- [x] pytest: unit tests (selection, feasibility, telemetry, validation) + every `scenarios/*.yaml` in mock mode
+      (`-m "not scenario"` for the fast part).
+- [x] Scenarios `domain_failure.yaml`, `sla_degradation.yaml`.
+- [x] Fixes found by the new scenarios: PENDING domains get their own (longer) timeout; the MBA handles
+      registration ACKs concurrently (startup of N domains ~2 s instead of ~2 s per domain).
 
 ### Stage 4 — extensibility and docs
 - `class: mypkg.MyRanBroker` in domain config for user-provided brokers.
-- Example scenarios: `basic`, `multi_domain` (URBAN/RURAL/SUBURBAN profiles from old `main.py`, 2 CORE),
-  `capacity_exhaustion`, `domain_failure`, `sla_degradation`.
+- Example scenarios: `capacity_exhaustion` (`basic`, `multi_domain`, `domain_failure`, `sla_degradation` exist).
 - README rewritten around scenarios; stale `main.py` removed.

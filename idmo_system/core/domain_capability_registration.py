@@ -11,7 +11,8 @@ from idmo_system.communication.api import (
 )
 
 class DomainCapabilityRegistration:
-    def __init__(self, nats_url="nats://localhost:4222", heartbeat_interval_s=10.0, max_missed_heartbeats=3):
+    def __init__(self, nats_url="nats://localhost:4222", heartbeat_interval_s=10.0, max_missed_heartbeats=3,
+                 pending_timeout_s=30.0):
         self.nats_url = nats_url
         self.nc = None
         self.domain_repository = {} 
@@ -19,6 +20,8 @@ class DomainCapabilityRegistration:
         self._max_missed_heartbeats = max_missed_heartbeats
         
         self._timeout_threshold = self._heartbeat_interval_s * self._max_missed_heartbeats
+        # A PENDING domain is still being set up (topics, consumers) - give it more time for its first heartbeat.
+        self._pending_timeout_s = max(pending_timeout_s, self._timeout_threshold)
 
     async def connect(self):
         """Connect to NATS and subscribe to Registration and Heartbeat events."""
@@ -123,8 +126,9 @@ class DomainCapabilityRegistration:
             for domain_id in list(self.domain_repository.keys()):
                 info = self.domain_repository[domain_id]
                 time_since_last = current_time - info["last_heartbeat"]
+                timeout = self._pending_timeout_s if info["status"] == "PENDING" else self._timeout_threshold
                 
-                if time_since_last > self._timeout_threshold:
+                if time_since_last > timeout:
                     log.error(f"Domain {domain_id} TIMEOUT! Deleting from registry.")
                     
                     failure_event = {"domain_id": domain_id, "reason": "Timeout - Deleted"}

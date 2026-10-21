@@ -97,24 +97,30 @@ class MessageBusAdapter:
         termination_sub = await self.nc.subscribe("service.order.terminate")
         clean_topics_sub = await self.nc.subscribe("clean.topics")
         
-        async def handle_registration_acks():
-            async for msg in registration_ack_sub.messages:
-                try:
-                    data = json.loads(msg.data.decode())
-                    domain_id = data.get("domain_unique_id")
-                    if domain_id:
-                        to_topic = f"unity6g.to.{domain_id}"
-                        from_topic = f"unity6g.from.{domain_id}"
-                        
-                        log.info(f"MBA: Registration ACK detected. Creating infra for {domain_id}")
-                        await self.register_new_topic(to_topic)
-                        await self.register_new_topic(from_topic)
+        async def relay_registration_ack(msg):
+            try:
+                data = json.loads(msg.data.decode())
+                domain_id = data.get("domain_unique_id")
+                if domain_id:
+                    to_topic = f"unity6g.to.{domain_id}"
+                    from_topic = f"unity6g.from.{domain_id}"
 
-                    topic = DomainRegistrationResponse.kafka_topic
-                    await self.producer.send_and_wait(topic, msg.data)
-                    log.success(f"MBA: Relayed Registration Response from NATS to Kafka topic: {topic}")
-                except Exception as e:
-                    log.error(f"MBA: Error relaying registration ack: {e}")
+                    log.info(f"MBA: Registration ACK detected. Creating infra for {domain_id}")
+                    await asyncio.gather(self.register_new_topic(to_topic), self.register_new_topic(from_topic))
+
+                topic = DomainRegistrationResponse.kafka_topic
+                await self.producer.send_and_wait(topic, msg.data)
+                log.success(f"MBA: Relayed Registration Response from NATS to Kafka topic: {topic}")
+            except Exception as e:
+                log.error(f"MBA: Error relaying registration ack: {e}")
+
+        async def handle_registration_acks():
+            # Each registration in its own task - topic creation takes a while and domains must not queue up.
+            pending = set()
+            async for msg in registration_ack_sub.messages:
+                task = asyncio.create_task(relay_registration_ack(msg))
+                pending.add(task)
+                task.add_done_callback(pending.discard)
 
         async def handle_feasibility():
             async for msg in feasibility_sub.messages:

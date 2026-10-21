@@ -1,8 +1,10 @@
-10:42:22 | #0 submitted: {'intent_owner': 'Anonymous', 'expression': 'Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.'} -> INT-72A64ED6
-10:42:24 | INT-72A64ED6 update: {'intent_id': 'INT-72A64ED6', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-1', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
-10:42:29 | INT-72A64ED6 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-72A64ED6', 'current_handling_state': 'STATE_COMPLIES'}
-10:42:44 | INT-72A64ED6 update: {'intent_id': 'INT-72A64ED6', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
-10:42:45 | Scenario 'basic' finished after 27.9s
+10:57:13 | #0 submitted: {'intent_owner': 'Anonymous', 'expression': 'Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.'} -> INT-6DDE79E4
+10:57:15 | INT-6DDE79E4 update: {'intent_id': 'INT-6DDE79E4', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-1', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+10:57:20 | INT-6DDE79E4 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-6DDE79E4', 'current_handling_state': 'STATE_COMPLIES'}
+10:57:36 | INT-6DDE79E4 update: {'intent_id': 'INT-6DDE79E4', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+10:57:36 | Scenario 'basic' finished after 24.7s
 Registered domains: ran-1, core-1
  #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
- 0    0.0  INT-72A64ED6  HANDLING_ENDED     ran-1+core-1                    1  -         Service lifecycle expired and resources released.
+ 0    0.0  INT-6DDE79E4  HANDLING_ENDED     ran-1+core-1                    1  -         Service lifecycle expired and resources released.
+Expectations: 1/1 passed
+RESULT: PASSED

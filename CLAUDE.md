@@ -14,10 +14,12 @@ as a showcase: don't over-engineer and don't import concepts from the private ve
   components are imported lazily inside `ScenarioRunner.run()`; one transport per process (`mocks.reset()` between runs).
   `real` uses `docker-compose.yaml` (Kafka :9092, Kafka UI :8080, NATS :4222, Ollama :11434 `qwen2.5-coder:1.5b`).
   `runtime.llm: mock` → `MockIntentTranslator` with scenario `translations`.
-- Output: `results/<scenario>/{nats,kafka,intents}.log` + summary table on stdout. `logs/` = output of the original demo.
+- Output: `results/<scenario>/{nats,kafka,intents}.log` + `report.json` + summary on stdout (exit 1 if `expect` fails).
+  `logs/` = output of the original demo.
 - `idmo_system/distributed_system_run.py` — backend only (no gateway), real brokers.
 - `main.py` — **stale**: imports non-existent `src.idmo`, `src.service_adapter` (leftover from an older layout).
-- No tests, no linter config.
+- Tests: `uv run pytest` (~2 min, runs every `scenarios/*.yaml`; each needs an `expect` section);
+  `uv run pytest -m "not scenario"` = unit tests only (~1 s). `tests/conftest.py` installs the mocks first. No linter config.
 
 ## Architecture (idmo_system/)
 - Two buses: **NATS** = internal IDMO control plane; **Kafka** = IDMO <-> domain transport. All Kafka topics prefixed `unity6g.`.
@@ -47,10 +49,8 @@ NATS subjects: `service.order.request`, `domain.registration.{request,ack}`, `do
 `domain.inventory.query`, `feasibility.check.{request,response}`, `service.order.request.dispatch`, `service.order.terminate`,
 `service.change.status`, `service.telemetry.report`, `monitor.service.{start,stop}`, `sls.violation`, `intent.status.update`, `clean.topics`.
 
-## Known issues (after Stage 2, 2026-10)
+## Known issues (after Stage 3, 2026-10)
 - Resources reserved at provisioning, not at feasibility → concurrent sagas can overbook a domain.
-- No fault injection / telemetry profiles yet (→ Stage 3). Recovery is TODO (`process_fault`, `_handle_service_recovery`);
-  on domain loss the surviving domain keeps its reservation.
-- Domain brokers' background tasks are not tracked/cancelled by the runner (harmless with `asyncio.run`, matters for tests).
-- MBA creates topics sequentially with 1 s sleeps → ~2 s per domain until it is UP (startup of large scenarios is slow).
+- Recovery is TODO (`process_fault` only logs once the SLA threshold is reached; `_handle_service_recovery` ends the
+  intent and releases the surviving domain). A lost domain cannot re-register under the same name while still in registry.
 - `main.py` is stale (→ removed in Stage 4).

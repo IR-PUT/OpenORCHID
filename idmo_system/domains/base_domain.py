@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from loguru import logger as log
 
+from idmo_system.domains.behavior import DomainEvent
+
 
 @dataclass
 class FeasibilityResult:
@@ -30,6 +32,9 @@ class BaseDomainBroker:
         self._temporary_domain_id = f"temp_{domain_type}_{uuid.uuid4().hex[:6]}"
         self.producer = None
 
+        self._tasks = set() # Background tasks, cancelled by stop()
+        self._heartbeat_enabled = True
+
     @property
     def domain_name(self) -> str:
         return self._domain_name
@@ -37,11 +42,35 @@ class BaseDomainBroker:
     async def start(self):
         await self.run(self.capabilities)
 
+    def _spawn(self, coro) -> asyncio.Task:
+        """Starts a background task owned by this domain."""
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    async def stop(self):
+        """Cancels all background work of the domain (listeners, heartbeats, telemetry)."""
+        tasks = list(self._tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def apply_event(self, event: DomainEvent):
+        """Injects a scenario event (fault) into the domain."""
+        log.warning(f"Domain {self._domain_name}: EVENT {event.action}")
+        if event.action == "stop_heartbeat":
+            self._heartbeat_enabled = False
+        elif event.action == "crash":
+            await self.stop()
+        else:
+            raise ValueError(f"{self._domain_type} domain does not support event '{event.action}'")
+
     async def run(self, capabilities):
         self.producer = AIOKafkaProducer(bootstrap_servers=self.kafka_bootstrap)
         await self.producer.start()
 
-        asyncio.create_task(self._subscribe_to_registration_responses())
+        self._spawn(self._subscribe_to_registration_responses())
         
         await asyncio.sleep(1.0) 
 
@@ -94,8 +123,8 @@ class BaseDomainBroker:
 
             self._heartbeat_interval = raw_message.get("heartbeat_interval_s", 30.0)
             # Start command listener immediately to avoid missing early feasibility requests.
-            asyncio.create_task(self._subscribe_to_direct_commands())
-            asyncio.create_task(self._heartbeat_loop())
+            self._spawn(self._subscribe_to_direct_commands())
+            self._spawn(self._heartbeat_loop())
         else:
             log.error(f"Failed to register domain: {raw_message.get('message')}")
 
@@ -103,7 +132,8 @@ class BaseDomainBroker:
         log.info(f"Heartbeat loop started. Interval: {self._heartbeat_interval}s")
         while self._domain_unique_id:
             try:
-                await self.send_heartbeat()
+                if self._heartbeat_enabled:
+                    await self.send_heartbeat()
                 await asyncio.sleep(self._heartbeat_interval)
             except Exception as e:
                 log.error(f"Heartbeat error: {e}")
@@ -134,10 +164,13 @@ class BaseDomainBroker:
         )
         await consumer.start()
         log.info(f'Subscribed to direct topic {self._topic_idmo_to_domain}')
-        
-        async for msg in consumer:
-            raw_message = json.loads(msg.value.decode())
-            await self.receive_direct_message_from_idmo(raw_message)
+
+        try:
+            async for msg in consumer:
+                raw_message = json.loads(msg.value.decode())
+                await self.receive_direct_message_from_idmo(raw_message)
+        finally:
+            await consumer.stop()
 
     async def receive_direct_message_from_idmo(self, raw_message: dict) -> None:
         
@@ -188,7 +221,7 @@ class BaseDomainBroker:
 
         if service_topic not in self._service_listeners:
             log.info(f"Broker: Starting dedicated listener for NEW service: {service_topic}")
-            task = asyncio.create_task(self._listen_to_service_topic(service_topic))
+            task = self._spawn(self._listen_to_service_topic(service_topic))
             self._service_listeners[service_topic] = task
 
         await self.setup_telemetry(data, service_topic)

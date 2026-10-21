@@ -99,4 +99,36 @@ result = asyncio.run(ScenarioRunner(Scenario.from_yaml("scenarios/basic.yaml")).
 print(result.summary())
 ```
 
-Runtime traces (all NATS and Kafka messages, intent updates) are written to `results/<scenario name>/`. API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).
+### Domain behaviour, events and expectations
+
+Simulated domains can be given different **telemetry profiles** (`constant`, `random`, `degrading`), and a scenario can
+inject **events** at given times: `crash` (the domain stops completely), `stop_heartbeat` (the registry declares it lost),
+`degrade` / `restore` (RAN telemetry worsens temporarily). An `expect` section turns a scenario into a test:
+
+```yaml
+events:
+  - { at_s: 5, domain: ran-a, action: crash }
+  - { at_s: 5, domain: ran-b, action: degrade, throughput_factor: 0.5, latency_factor: 3.0 }
+expect:
+  - { intent: 0, final_state: HANDLING_ENDED, ran: ran-a, message_contains: "lost heartbeat" }
+  - { intent: 1, final_state: REJECTED, attempts: 4 }
+  - { intent: 2, sla_degraded: true }
+```
+
+`python -m idmo_system run` exits with code 1 when an expectation fails. Example scenarios:
+
+| Scenario | Shows |
+|---|---|
+| `basic` | One RAN, one CORE, one intent through the whole lifecycle |
+| `multi_domain` | Domain selection (link latency, TA coverage), capacity limits, retries with the next candidate |
+| `domain_failure` | A crashed RAN and a RAN without heartbeats; resources released for later intents |
+| `sla_degradation` | Degrading, randomly fluctuating and temporarily degraded telemetry vs. the SLA |
+
+### Tests
+
+```bash
+uv run pytest                     # unit tests + every scenario in scenarios/ (~2 min)
+uv run pytest -m "not scenario"   # unit tests only (~1 s)
+```
+
+Runtime traces (all NATS and Kafka messages, intent updates) and a `report.json` with the full result are written to `results/<scenario name>/`.API status can be inspected via the gateway endpoints (`GET /intents`, `GET /intents/{intent_id}`).

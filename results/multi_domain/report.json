@@ -1,0 +1,811 @@
+{
+  "scenario": "multi_domain",
+  "passed": true,
+  "elapsed_s": 28.89,
+  "registered_domains": [
+    "core-central",
+    "core-edge",
+    "ran-urban",
+    "ran-rural",
+    "ran-suburban"
+  ],
+  "missing_domains": [],
+  "events": [],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "factory-operator",
+      "at_s": 0.0,
+      "request": {
+        "expression": "Low-latency slice for robots in TA 1000 for 20 seconds, 100 MHz, latency under 10 ms."
+      },
+      "intent_id": "INT-4864E5F8",
+      "submitted_at_s": 0.00045769999269396067,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-urban",
+        "core": "core-edge"
+      },
+      "attempts": [
+        {
+          "ran": "ran-urban",
+          "core": "core-edge",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 2.114,
+          "intent_id": "INT-4864E5F8",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-urban",
+            "core": "core-edge"
+          },
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 4.121,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-4864E5F8",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 22.154,
+          "intent_id": "INT-4864E5F8",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "owner": "video-streaming",
+      "at_s": 2.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 1000.0,
+            "tac": 2000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 3
+          }
+        }
+      },
+      "intent_id": "INT-5045BBDF",
+      "submitted_at_s": 2.01584610005375,
+      "final_state": "REJECTED",
+      "selected_domains": null,
+      "attempts": [
+        {
+          "ran": "ran-urban",
+          "core": "core-edge",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "1000 MHz requested, 400 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 400.0,
+              "num_ues": 1000
+            }
+          }
+        },
+        {
+          "ran": "ran-suburban",
+          "core": "core-edge",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "1000 MHz requested, 200 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 200.0,
+              "num_ues": 500
+            }
+          }
+        },
+        {
+          "ran": "ran-urban",
+          "core": "core-central",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "1000 MHz requested, 300 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 300.0,
+              "num_ues": 1000
+            }
+          }
+        },
+        {
+          "ran": "ran-suburban",
+          "core": "core-central",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "1000 MHz requested, 200 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 200.0,
+              "num_ues": 500
+            }
+          }
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Feasibility check failed for all 4 candidate(s); last: ran-suburban: 1000 MHz requested, 200 MHz available.",
+      "history": [
+        {
+          "t_s": 2.05,
+          "intent_id": "INT-5045BBDF",
+          "message": "Attempt 1/4 rejected (ran-urban: 1000 MHz requested, 400 MHz available), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 400 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 400.0,
+                  "num_ues": 1000
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 2.112,
+          "intent_id": "INT-5045BBDF",
+          "message": "Attempt 2/4 rejected (ran-suburban: 1000 MHz requested, 200 MHz available), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 400 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 400.0,
+                  "num_ues": 1000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 200 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 200.0,
+                  "num_ues": 500
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 2.174,
+          "intent_id": "INT-5045BBDF",
+          "message": "Attempt 3/4 rejected (ran-urban: 1000 MHz requested, 300 MHz available), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 400 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 400.0,
+                  "num_ues": 1000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 200 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 200.0,
+                  "num_ues": 500
+                }
+              }
+            },
+            {
+              "ran": "ran-urban",
+              "core": "core-central",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 300 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 300.0,
+                  "num_ues": 1000
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 2.237,
+          "intent_id": "INT-5045BBDF",
+          "current_handling_state": "REJECTED",
+          "message": "Feasibility check failed for all 4 candidate(s); last: ran-suburban: 1000 MHz requested, 200 MHz available.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 400 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 400.0,
+                  "num_ues": 1000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 200 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 200.0,
+                  "num_ues": 500
+                }
+              }
+            },
+            {
+              "ran": "ran-urban",
+              "core": "core-central",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 300 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 300.0,
+                  "num_ues": 1000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-central",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "1000 MHz requested, 200 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 200.0,
+                  "num_ues": 500
+                }
+              }
+            }
+          ],
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 200.0,
+              "num_ues": 500
+            }
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "owner": "stadium-event",
+      "at_s": 4.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 200.0,
+            "throughput_mbps": 150.0,
+            "tac": 1000,
+            "duration_s": 20.0
+          },
+          "core": {
+            "priority": 1,
+            "latency_ms": 20.0
+          }
+        }
+      },
+      "intent_id": "INT-7C2B37D1",
+      "submitted_at_s": 4.00767950003501,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-urban",
+        "core": "core-edge"
+      },
+      "attempts": [
+        {
+          "ran": "ran-urban",
+          "core": "core-edge",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": true,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 6.133,
+          "intent_id": "INT-7C2B37D1",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-urban",
+            "core": "core-edge"
+          },
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 8.148,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-7C2B37D1",
+          "current_handling_state": "STATE_DEGRADES"
+        },
+        {
+          "t_s": 26.195,
+          "intent_id": "INT-7C2B37D1",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "owner": "campus-network",
+      "at_s": 8.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 150.0,
+            "num_ues": 300,
+            "tac": 2000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 2
+          }
+        }
+      },
+      "intent_id": "INT-64734549",
+      "submitted_at_s": 8.00637179997284,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-suburban",
+        "core": "core-central"
+      },
+      "attempts": [
+        {
+          "ran": "ran-urban",
+          "core": "core-edge",
+          "ran_ok": false,
+          "core_ok": false,
+          "reasons": {
+            "ran": "150 MHz requested, 100 MHz available",
+            "core": "service limit reached (2/2)"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 100.0,
+              "num_ues": 1000
+            },
+            "core": {
+              "num_ues": 5000
+            }
+          }
+        },
+        {
+          "ran": "ran-suburban",
+          "core": "core-edge",
+          "ran_ok": true,
+          "core_ok": false,
+          "reasons": {
+            "core": "service limit reached (2/2)"
+          },
+          "proposals": {
+            "core": {
+              "num_ues": 5000
+            }
+          }
+        },
+        {
+          "ran": "ran-urban",
+          "core": "core-central",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "150 MHz requested, 100 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 100.0,
+              "num_ues": 1000
+            }
+          }
+        },
+        {
+          "ran": "ran-suburban",
+          "core": "core-central",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 8.055,
+          "intent_id": "INT-64734549",
+          "message": "Attempt 1/4 rejected (ran-urban: 150 MHz requested, 100 MHz available, core-edge: service limit reached (2/2)), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": false,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available",
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                },
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 8.117,
+          "intent_id": "INT-64734549",
+          "message": "Attempt 2/4 rejected (core-edge: service limit reached (2/2)), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": false,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available",
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                },
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": true,
+              "core_ok": false,
+              "reasons": {
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 8.18,
+          "intent_id": "INT-64734549",
+          "message": "Attempt 3/4 rejected (ran-urban: 150 MHz requested, 100 MHz available), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": false,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available",
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                },
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": true,
+              "core_ok": false,
+              "reasons": {
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            },
+            {
+              "ran": "ran-urban",
+              "core": "core-central",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 10.338,
+          "intent_id": "INT-64734549",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-suburban",
+            "core": "core-central"
+          },
+          "attempts": [
+            {
+              "ran": "ran-urban",
+              "core": "core-edge",
+              "ran_ok": false,
+              "core_ok": false,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available",
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                },
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-edge",
+              "ran_ok": true,
+              "core_ok": false,
+              "reasons": {
+                "core": "service limit reached (2/2)"
+              },
+              "proposals": {
+                "core": {
+                  "num_ues": 5000
+                }
+              }
+            },
+            {
+              "ran": "ran-urban",
+              "core": "core-central",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "150 MHz requested, 100 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 100.0,
+                  "num_ues": 1000
+                }
+              }
+            },
+            {
+              "ran": "ran-suburban",
+              "core": "core-central",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 12.348,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-64734549",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 25.387,
+          "intent_id": "INT-64734549",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "owner": "agriculture",
+      "at_s": 10.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 20.0,
+            "tac": 3000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "latency_ms": 20.0
+          }
+        }
+      },
+      "intent_id": "INT-E78E431F",
+      "submitted_at_s": 10.005557799944654,
+      "final_state": "REJECTED",
+      "selected_domains": null,
+      "attempts": [],
+      "sla_degraded": false,
+      "last_message": "Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).",
+      "history": [
+        {
+          "t_s": 10.009,
+          "intent_id": "INT-E78E431F",
+          "current_handling_state": "REJECTED",
+          "message": "Orchestration error: No UP RAN/CORE pair matches the request (TA coverage, RAN-CORE links, link latency).",
+          "attempts": [],
+          "proposals": {}
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "owner": "unknown-user",
+      "at_s": 12.0,
+      "request": {
+        "expression": "Something the mock LLM does not know."
+      },
+      "intent_id": null,
+      "submitted_at_s": 12.00327109999489,
+      "final_state": "SUBMISSION_FAILED",
+      "selected_domains": null,
+      "attempts": [],
+      "sla_degraded": false,
+      "last_message": "HTTP 422: Translation Error: Translator returned no data for the given expression.",
+      "history": []
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-urban",
+      "core": "core-edge",
+      "attempts": 1,
+      "sla_degraded": false,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 1,
+      "final_state": "REJECTED",
+      "attempts": 4,
+      "message_contains": "1000 MHz requested",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 2,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-urban",
+      "core": "core-edge",
+      "sla_degraded": true,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 3,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-suburban",
+      "core": "core-central",
+      "attempts": 4,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 4,
+      "final_state": "REJECTED",
+      "attempts": 0,
+      "message_contains": "No UP RAN/CORE pair",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 5,
+      "final_state": "SUBMISSION_FAILED",
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

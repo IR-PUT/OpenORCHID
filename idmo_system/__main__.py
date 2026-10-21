@@ -31,6 +31,8 @@ def cmd_validate(args) -> int:
     print(f"  RAN domains:  {', '.join(ran) or '-'}")
     print(f"  CORE domains: {', '.join(core) or '-'}")
     print(f"  Intents:      {len(scenario.intents)}")
+    print(f"  Events:       {len(scenario.events)}")
+    print(f"  Expectations: {len(scenario.expect)}")
     print(f"  Transport:    {scenario.runtime.transport}, LLM: {scenario.runtime.llm}")
     return 0
 
@@ -40,11 +42,15 @@ def cmd_run(args) -> int:
     log.remove()
     log.add(sys.stderr, level=args.log_level)
 
+    if args.output_dir is not None:
+        scenario.runtime.output_dir = args.output_dir
+
     from idmo_system.runner import ScenarioRunner
     result = asyncio.run(ScenarioRunner(scenario).run())
     print()
     print(result.summary())
-    return 0
+    # Non-zero exit code when an `expect` entry failed or a domain did not register - usable in CI.
+    return 0 if result.passed else 1
 
 
 def main() -> int:
@@ -58,6 +64,7 @@ def main() -> int:
     p_run = sub.add_parser("run", help="Run a scenario")
     p_run.add_argument("scenario")
     p_run.add_argument("--log-level", default="INFO", help="Console log level (default: INFO)")
+    p_run.add_argument("--output-dir", help="Override runtime.output_dir (logs and report.json)")
     p_run.set_defaults(func=cmd_run)
 
     args = parser.parse_args()

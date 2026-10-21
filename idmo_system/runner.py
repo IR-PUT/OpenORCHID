@@ -3,6 +3,7 @@
     scenario = Scenario.from_yaml("scenarios/basic.yaml")
     result = asyncio.run(ScenarioRunner(scenario).run())
     print(result.summary())
+    assert result.passed # all `expect` entries matched and all domains registered
 
 Components are imported lazily inside run(), after the Kafka/NATS mocks are installed (transport: mock).
 One process can use only one transport, because the mocks replace aiokafka/nats in sys.modules.
@@ -19,7 +20,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger as log
 
-from idmo_system.scenario import IntentConfig, Scenario
+from idmo_system.scenario import ExpectConfig, IntentConfig, Scenario
 
 TERMINAL_HANDLING_STATES = ("HANDLING_ENDED", "REJECTED")
 
@@ -79,6 +80,53 @@ class IntentResult:
             return "NOT_SUBMITTED"
         return self.handling_state or self.lifecycle_status or "UNKNOWN"
 
+    @property
+    def last_message(self) -> str:
+        return self.error or self._latest("message") or ""
+
+    def to_dict(self) -> dict:
+        return {
+            "index": self.index,
+            "owner": self.config.owner,
+            "at_s": self.config.at_s,
+            "request": self.config.model_dump(exclude_none=True, exclude={"at_s", "owner"}),
+            "intent_id": self.intent_id,
+            "submitted_at_s": self.submitted_at_s,
+            "final_state": self.final_state,
+            "selected_domains": self.selected_domains,
+            "attempts": self.attempts,
+            "sla_degraded": self.sla_degraded,
+            "last_message": self.last_message,
+            "history": self.history,
+        }
+
+
+@dataclass
+class ExpectationResult:
+    expectation: ExpectConfig
+    failures: list[str] # Empty when the expectation matched
+
+    @property
+    def passed(self) -> bool:
+        return not self.failures
+
+
+def check_expectation(e: ExpectConfig, r: IntentResult) -> ExpectationResult:
+    domains = r.selected_domains or {}
+    actual = {
+        "final_state": r.final_state,
+        "ran": domains.get("ran"),
+        "core": domains.get("core"),
+        "attempts": len(r.attempts),
+        "sla_degraded": r.sla_degraded,
+    }
+    failures = [f"{key}: expected {getattr(e, key)!r}, got {value!r}"
+                for key, value in actual.items()
+                if getattr(e, key) is not None and getattr(e, key) != value]
+    if e.message_contains is not None and e.message_contains not in r.last_message:
+        failures.append(f"message: expected to contain {e.message_contains!r}, got {r.last_message!r}")
+    return ExpectationResult(e, failures)
+
 
 @dataclass
 class ScenarioResult:
@@ -87,6 +135,25 @@ class ScenarioResult:
     missing_domains: list[str]
     intents: list[IntentResult]
     elapsed_s: float = 0.0
+    events: list[dict] = field(default_factory=list) # Events fired, with "t_s"
+    expectations: list[ExpectationResult] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        return not self.missing_domains and all(e.passed for e in self.expectations)
+
+    def to_dict(self) -> dict:
+        return {
+            "scenario": self.scenario,
+            "passed": self.passed,
+            "elapsed_s": round(self.elapsed_s, 2),
+            "registered_domains": self.registered_domains,
+            "missing_domains": self.missing_domains,
+            "events": self.events,
+            "intents": [r.to_dict() for r in self.intents],
+            "expectations": [{**e.expectation.model_dump(exclude_none=True), "passed": e.passed, "failures": e.failures}
+                             for e in self.expectations],
+        }
 
     def summary(self) -> str:
         lines = [
@@ -98,11 +165,20 @@ class ScenarioResult:
         lines.append(f"{'#':>2}  {'at_s':>5}  {'intent_id':<12}  {'final state':<17}  {'domains (RAN+CORE)':<26}  "
                      f"{'tries':>5}  {'SLA':<8}  last message")
         for r in self.intents:
-            last_message = r.error or r._latest("message") or ""
             sla = "degraded" if r.sla_degraded else "-"
             domains = f"{r.selected_domains['ran']}+{r.selected_domains['core']}" if r.selected_domains else "-"
             lines.append(f"{r.index:>2}  {r.config.at_s:>5.1f}  {r.intent_id or '-':<12}  {r.final_state:<17}  {domains:<26}  "
-                         f"{len(r.attempts):>5}  {sla:<8}  {last_message}")
+                         f"{len(r.attempts):>5}  {sla:<8}  {r.last_message}")
+        if self.events:
+            lines.append("Events: " + ", ".join(f"{e['action']} {e['domain']} @{e['t_s']:.1f}s" for e in self.events))
+        if self.expectations:
+            passed = sum(e.passed for e in self.expectations)
+            lines.append(f"Expectations: {passed}/{len(self.expectations)} passed")
+            for e in self.expectations:
+                if not e.passed:
+                    lines.append(f"  FAILED intent {e.expectation.intent}: " + "; ".join(e.failures))
+        if self.expectations or self.missing_domains:
+            lines.append("RESULT: " + ("PASSED" if self.passed else "FAILED"))
         return "\n".join(lines)
 
 
@@ -111,7 +187,9 @@ class ScenarioRunner:
         self.scenario = scenario
         self._t0 = None
         self._updates: dict[str, list[dict]] = {} # intent_id -> status updates
+        self._fired_events: list[dict] = []
         self._log_files = {}
+        self._out_dir: Path | None = None
 
     def _now_s(self) -> float:
         return 0.0 if self._t0 is None else time.monotonic() - self._t0
@@ -138,6 +216,7 @@ class ScenarioRunner:
         self._open_log_files()
         started = time.monotonic()
         tasks = []
+        brokers = {}
 
         try:
             if rt.transport == "real":
@@ -173,9 +252,14 @@ class ScenarioRunner:
             tasks.append(gateway_task)
 
             for d in self.scenario.domains:
-                broker_cls = RANDomainBroker if d.type == "ran" else CoreDomainBroker
-                broker = broker_cls(domain_name=d.name, capabilities=d.capabilities,
-                                    behavior=d.behavior, kafka_bootstrap=rt.kafka_bootstrap)
+                if d.type == "ran":
+                    seed = None if rt.seed is None else f"{rt.seed}:{d.name}"
+                    broker = RANDomainBroker(domain_name=d.name, capabilities=d.capabilities, behavior=d.behavior,
+                                             kafka_bootstrap=rt.kafka_bootstrap, seed=seed)
+                else:
+                    broker = CoreDomainBroker(domain_name=d.name, capabilities=d.capabilities,
+                                              behavior=d.behavior, kafka_bootstrap=rt.kafka_bootstrap)
+                brokers[d.name] = broker
                 tasks.append(asyncio.create_task(broker.start()))
 
             missing = await self._wait_for_registration(registry)
@@ -186,11 +270,13 @@ class ScenarioRunner:
             log.info("SCENARIO: t=0, system ready. Submitting intents.")
             results = [IntentResult(index=i, config=c) for i, c in enumerate(self.scenario.intents)]
             submitter = asyncio.create_task(self._submit_intents(results))
-            tasks.append(submitter)
+            event_injector = asyncio.create_task(self._fire_events(brokers))
+            tasks += [submitter, event_injector]
 
             while self._now_s() < rt.duration_s:
                 self._refresh_results(results)
-                if rt.stop_when_done and submitter.done() and all(r.is_terminal for r in results):
+                if (rt.stop_when_done and submitter.done() and event_injector.done()
+                        and all(r.is_terminal for r in results)):
                     log.info("SCENARIO: All intents reached a terminal state.")
                     break
                 await asyncio.sleep(0.2)
@@ -204,13 +290,17 @@ class ScenarioRunner:
             await nc.close()
 
             registered = [d.name for d in self.scenario.domains if d.name not in missing]
-            result = ScenarioResult(self.scenario.name, registered, missing, results, time.monotonic() - started)
+            result = ScenarioResult(self.scenario.name, registered, missing, results, time.monotonic() - started,
+                                    events=self._fired_events,
+                                    expectations=[check_expectation(e, results[e.intent]) for e in self.scenario.expect])
             self._write_intent_log(result.summary())
+            self._write_report(result)
             return result
         finally:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*(b.stop() for b in brokers.values()), return_exceptions=True)
             self._close_log_files()
 
     async def _wait_for_registration(self, registry) -> list[str]:
@@ -249,6 +339,15 @@ class ScenarioRunner:
                     r.error = f"HTTP {resp.status}: {body.get('detail')}"
                     log.warning(f"SCENARIO: Intent #{r.index} not accepted - {r.error}")
                 self._write_intent_log(f"#{r.index} submitted: {payload} -> {r.intent_id or r.error}")
+
+    async def _fire_events(self, brokers: dict):
+        for event in sorted(self.scenario.events, key=lambda e: e.at_s):
+            await asyncio.sleep(max(0.0, event.at_s - self._now_s()))
+            log.warning(f"SCENARIO: Event '{event.action}' on {event.domain}")
+            fired = {"t_s": round(self._now_s(), 3), **event.model_dump()}
+            self._fired_events.append(fired)
+            self._write_intent_log(f"EVENT {fired}")
+            await brokers[event.domain].apply_event(event)
 
     async def _on_intent_update(self, msg):
         data = json.loads(msg.data.decode())
@@ -307,9 +406,17 @@ class ScenarioRunner:
             return
         out_dir = Path(self.scenario.runtime.output_dir) / re.sub(r"[^a-zA-Z0-9_-]", "_", self.scenario.name)
         out_dir.mkdir(parents=True, exist_ok=True)
+        self._out_dir = out_dir
         for name in ("nats", "kafka", "intents"):
             self._log_files[name] = open(out_dir / f"{name}.log", "w", encoding="utf-8")
         log.info(f"SCENARIO: Writing logs to {out_dir}")
+
+    def _write_report(self, result: ScenarioResult):
+        if self._out_dir is None:
+            return
+        report_path = self._out_dir / "report.json"
+        report_path.write_text(json.dumps(result.to_dict(), indent=2, default=str), encoding="utf-8")
+        log.info(f"SCENARIO: Report written to {report_path}")
 
     def _write_log(self, name: str, line: str):
         f = self._log_files.get(name)

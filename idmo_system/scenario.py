@@ -11,7 +11,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from idmo_system.communication.api import ResourceFacingService, UnityCoreCapabilities, UnityRanCapabilities
-from idmo_system.domains.behavior import CoreBehavior, RanBehavior
+from idmo_system.domains.behavior import CoreBehavior, DomainEvent, RanBehavior
 
 
 class _StrictModel(BaseModel):
@@ -29,7 +29,8 @@ class RuntimeConfig(_StrictModel):
     llm_model: str = "qwen2.5-coder:1.5b"
     gateway_port: int = 8000
     registration_timeout_s: float = 30.0 # How long to wait for all domains to register before t=0
-    output_dir: str | None = "results" # Logs go to <output_dir>/<scenario name>/; None disables file logs
+    output_dir: str | None = "results" # Logs and report.json go to <output_dir>/<scenario name>/; None disables files
+    seed: int | None = None # Makes "random" telemetry reproducible
 
 
 class OrchestratorConfig(_StrictModel):
@@ -81,6 +82,21 @@ class IntentConfig(_StrictModel):
         return self
 
 
+FinalState = Literal["HANDLING_ENDED", "REJECTED", "SUBMISSION_FAILED", "STATE_COMPLIES", "STATE_DEGRADES",
+                     "IDLE", "NOT_SUBMITTED", "UNKNOWN"]
+
+
+class ExpectConfig(_StrictModel):
+    """Assertion checked after the run; every given field must match."""
+    intent: int # Index in `intents`
+    final_state: FinalState | None = None
+    ran: str | None = None # Domain the service was provisioned on
+    core: str | None = None
+    attempts: int | None = None # Number of (RAN, CORE) candidates asked for feasibility
+    sla_degraded: bool | None = None # SLA degradation reported at any point
+    message_contains: str | None = None # Substring of the last status message
+
+
 class Scenario(_StrictModel):
     name: str
     description: str = ""
@@ -89,6 +105,8 @@ class Scenario(_StrictModel):
     orchestrator: OrchestratorConfig = OrchestratorConfig()
     domains: list[DomainConfig] = Field(min_length=1)
     intents: list[IntentConfig] = []
+    events: list[DomainEvent] = []
+    expect: list[ExpectConfig] = []
     translations: dict[str, ResourceFacingService] = {} # Mock LLM: expression -> RFS
 
     @model_validator(mode="after")
@@ -104,6 +122,20 @@ class Scenario(_StrictModel):
                 unknown = set(domain.capabilities.core_links) - core_names
                 if unknown:
                     raise ValueError(f"domain '{domain.name}': core_links refer to unknown CORE domains {sorted(unknown)}")
+
+        domain_types = {d.name: d.type for d in self.domains}
+        for event in self.events:
+            if event.domain not in domain_types:
+                raise ValueError(f"event at {event.at_s}s refers to unknown domain '{event.domain}'")
+            if event.action in ("degrade", "restore") and domain_types[event.domain] != "ran":
+                raise ValueError(f"event '{event.action}' is only supported for RAN domains, not '{event.domain}'")
+
+        for e in self.expect:
+            if not 0 <= e.intent < len(self.intents):
+                raise ValueError(f"expect refers to intent {e.intent}, but there are {len(self.intents)} intents (0-based)")
+            for name in (e.ran, e.core):
+                if name is not None and name not in domain_types:
+                    raise ValueError(f"expect for intent {e.intent} refers to unknown domain '{name}'")
         return self
 
     @classmethod

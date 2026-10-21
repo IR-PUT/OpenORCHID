@@ -1,0 +1,84 @@
+{
+  "scenario": "basic",
+  "passed": true,
+  "elapsed_s": 24.7,
+  "registered_domains": [
+    "ran-1",
+    "core-1"
+  ],
+  "missing_domains": [],
+  "events": [],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "expression": "Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000."
+      },
+      "intent_id": "INT-6DDE79E4",
+      "submitted_at_s": 0.0003575999289751053,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-1",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-1",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 2.131,
+          "intent_id": "INT-6DDE79E4",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-1",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-1",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 7.133,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-6DDE79E4",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 22.172,
+          "intent_id": "INT-6DDE79E4",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-1",
+      "core": "core-1",
+      "passed": true,
+      "failures": []
+    }
+  ]
+}
