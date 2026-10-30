@@ -4,7 +4,7 @@
 OpenORCHID - Open version of ORCHestration for Inter-Domain management
 </h3>
 <p align="center">
-    <img src="orchid-logo.svg" alt="ORCHID Logo" width="200">
+    <img src="orchid-logo.png" alt="ORCHID Logo" width="200">
 </p>
 
 

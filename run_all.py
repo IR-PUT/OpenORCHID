@@ -13,7 +13,7 @@ from loguru import logger
 from idmo_system.runner import ScenarioRunner
 from idmo_system.scenario import Scenario
 
-SCENARIO_FILE = "scenarios/basic.yaml"
+SCENARIO_FILE = "scenarios/multi_domain.yaml"
 
 
 if __name__ == "__main__":
