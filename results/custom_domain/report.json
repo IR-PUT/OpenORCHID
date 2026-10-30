@@ -1,0 +1,245 @@
+{
+  "scenario": "custom_domain",
+  "passed": true,
+  "elapsed_s": 23.71,
+  "registered_domains": [
+    "core-1",
+    "ran-hospital"
+  ],
+  "missing_domains": [],
+  "events": [],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "visitors-wifi",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 40.0,
+            "tac": 1000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 3
+          }
+        }
+      },
+      "intent_id": "INT-8CADE0F7",
+      "submitted_at_s": 0.00045689998660236597,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-hospital",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-hospital",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 2.14,
+          "intent_id": "INT-8CADE0F7",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-hospital",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-hospital",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 7.148,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-8CADE0F7",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 17.218,
+          "intent_id": "INT-8CADE0F7",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "owner": "video-archive",
+      "at_s": 2.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 30.0,
+            "tac": 1000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 2
+          }
+        }
+      },
+      "intent_id": "INT-D20246B4",
+      "submitted_at_s": 2.013368299929425,
+      "final_state": "REJECTED",
+      "selected_domains": null,
+      "attempts": [
+        {
+          "ran": "ran-hospital",
+          "core": "core-1",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services)"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 10.0
+            }
+          }
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Feasibility check failed for all 1 candidate(s); last: ran-hospital: 30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services).",
+      "history": [
+        {
+          "t_s": 2.046,
+          "intent_id": "INT-D20246B4",
+          "current_handling_state": "REJECTED",
+          "message": "Feasibility check failed for all 1 candidate(s); last: ran-hospital: 30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services).",
+          "attempts": [
+            {
+              "ran": "ran-hospital",
+              "core": "core-1",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services)"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 10.0
+                }
+              }
+            }
+          ],
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 10.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "owner": "emergency-team",
+      "at_s": 4.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 50.0,
+            "tac": 1000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-D34BC3A7",
+      "submitted_at_s": 4.008209999999963,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-hospital",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-hospital",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 6.104,
+          "intent_id": "INT-D34BC3A7",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-hospital",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-hospital",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 11.114,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-D34BC3A7",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 21.159,
+          "intent_id": "INT-D34BC3A7",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-hospital",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 1,
+      "final_state": "REJECTED",
+      "attempts": 1,
+      "message_contains": "kept for priority-1 services",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 2,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-hospital",
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

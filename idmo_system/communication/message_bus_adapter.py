@@ -1,12 +1,11 @@
 import json
 import asyncio
 from nats.aio.client import Client as NATS
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer, TopicPartition
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from loguru import logger as log
 
 from idmo_system.communication.api import DomainHealthMessage, DomainRegistrationRequest, DomainRegistrationResponse
-from idmo_system.mock_broker import MockKafkaBroker, MockNATSBroker
 
 class MessageBusAdapter:
     def __init__(self, kafka_bootstrap="localhost:9092", nats_url="nats://localhost:4222"):
@@ -24,7 +23,14 @@ class MessageBusAdapter:
         self.consumer = AIOKafkaConsumer(
             bootstrap_servers=self.kafka_bootstrap,
             group_id="idmo_mba_group",
-            metadata_max_age_ms=5000 
+            metadata_max_age_ms=5000,
+            # Joining the group and discovering pattern-matched topics takes a few seconds on a real broker;
+            # messages produced meanwhile (registrations, first heartbeats) must not be skipped.
+            # Committed offsets of the group still take precedence on restart.
+            auto_offset_reset="earliest",
+            # Topics come and go (services, lost domains). Autocommit retries a commit for a deleted topic forever
+            # and blocks the consumer, so offsets are committed manually, per processed message.
+            enable_auto_commit=False
         )
         await self.consumer.start()
 
@@ -91,31 +97,43 @@ class MessageBusAdapter:
             except Exception as e:
                 log.error(f"MBA Error during Kafka-to-NATS translation: {e}")
 
+            try:
+                await self.consumer.commit({TopicPartition(msg.topic, msg.partition): msg.offset + 1})
+            except Exception as e:
+                log.debug(f"MBA: Offset commit for {msg.topic} failed (topic deleted?): {e}")
+
     async def nats_to_kafka_bridge(self):
         registration_ack_sub = await self.nc.subscribe("domain.registration.ack")
         feasibility_sub = await self.nc.subscribe("feasibility.check.request")
+        feasibility_release_sub = await self.nc.subscribe("feasibility.release")
         provision_sub = await self.nc.subscribe("service.order.request.dispatch")
         termination_sub = await self.nc.subscribe("service.order.terminate")
         clean_topics_sub = await self.nc.subscribe("clean.topics")
         
-        async def handle_registration_acks():
-            async for msg in registration_ack_sub.messages:
-                try:
-                    data = json.loads(msg.data.decode())
-                    domain_id = data.get("domain_unique_id")
-                    if domain_id:
-                        to_topic = f"unity6g.to.{domain_id}"
-                        from_topic = f"unity6g.from.{domain_id}"
-                        
-                        log.info(f"MBA: Registration ACK detected. Creating infra for {domain_id}")
-                        await self.register_new_topic(to_topic)
-                        await self.register_new_topic(from_topic)
+        async def relay_registration_ack(msg):
+            try:
+                data = json.loads(msg.data.decode())
+                domain_id = data.get("domain_unique_id")
+                if domain_id:
+                    to_topic = f"unity6g.to.{domain_id}"
+                    from_topic = f"unity6g.from.{domain_id}"
 
-                    topic = DomainRegistrationResponse.kafka_topic
-                    await self.producer.send_and_wait(topic, msg.data)
-                    log.success(f"MBA: Relayed Registration Response from NATS to Kafka topic: {topic}")
-                except Exception as e:
-                    log.error(f"MBA: Error relaying registration ack: {e}")
+                    log.info(f"MBA: Registration ACK detected. Creating infra for {domain_id}")
+                    await asyncio.gather(self.register_new_topic(to_topic), self.register_new_topic(from_topic))
+
+                topic = DomainRegistrationResponse.kafka_topic
+                await self.producer.send_and_wait(topic, msg.data)
+                log.success(f"MBA: Relayed Registration Response from NATS to Kafka topic: {topic}")
+            except Exception as e:
+                log.error(f"MBA: Error relaying registration ack: {e}")
+
+        async def handle_registration_acks():
+            # Each registration in its own task - topic creation takes a while and domains must not queue up.
+            pending = set()
+            async for msg in registration_ack_sub.messages:
+                task = asyncio.create_task(relay_registration_ack(msg))
+                pending.add(task)
+                task.add_done_callback(pending.discard)
 
         async def handle_feasibility():
             async for msg in feasibility_sub.messages:
@@ -125,6 +143,13 @@ class MessageBusAdapter:
                     await self._route_to_kafka_domain_specific_topic(data, msg.data)
                 except Exception as e:
                     log.error(f"MBA: Feasibility routing error: {e}")
+
+        async def handle_feasibility_release():
+            async for msg in feasibility_release_sub.messages:
+                try:
+                    await self._route_to_kafka_domain_specific_topic(json.loads(msg.data.decode()), msg.data)
+                except Exception as e:
+                    log.error(f"MBA: Feasibility release routing error: {e}")
 
         async def handle_provisioning():
             async for msg in provision_sub.messages:
@@ -175,7 +200,8 @@ class MessageBusAdapter:
                     log.error(f"MBA: Infrastructure cleanup error: {e}")
 
         await asyncio.gather(handle_registration_acks(), 
-                             handle_feasibility(), 
+                             handle_feasibility(),
+                             handle_feasibility_release(),
                              handle_provisioning(),
                              handle_termination(),
                              handle_domain_infrastructure_cleanup())
@@ -193,7 +219,6 @@ class MessageBusAdapter:
 
     async def register_new_topic(self, topic_name):
         """Ensures the topic exists in Kafka and then subscribes."""
-        # 1. Create topic via Admin Client (like in your provided code)
         admin_client = AIOKafkaAdminClient(bootstrap_servers=self.kafka_bootstrap)
         await admin_client.start()
         try:
@@ -214,6 +239,13 @@ class MessageBusAdapter:
             self.kafka_to_nats_bridge(),
             self.nats_to_kafka_bridge()
         )
+
+    async def stop(self):
+        """Closes the Kafka clients (call after the start() task was cancelled)."""
+        for client in (self.consumer, self.producer):
+            if client is not None:
+                await client.stop()
+        self.consumer = self.producer = None
 
 if __name__ == "__main__":
     mba = MessageBusAdapter()

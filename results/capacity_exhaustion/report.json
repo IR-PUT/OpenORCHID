@@ -1,0 +1,381 @@
+{
+  "scenario": "capacity_exhaustion",
+  "passed": true,
+  "elapsed_s": 27.7,
+  "registered_domains": [
+    "core-1",
+    "ran-1",
+    "ran-2"
+  ],
+  "missing_domains": [],
+  "events": [],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 40.0,
+            "tac": 1000,
+            "duration_s": 12.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-4E00B29B",
+      "submitted_at_s": 0.00042159995064139366,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-1",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-1",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 2.131,
+          "intent_id": "INT-4E00B29B",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-1",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-1",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 7.143,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-4E00B29B",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 14.183,
+          "intent_id": "INT-4E00B29B",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "owner": "Anonymous",
+      "at_s": 2.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 40.0,
+            "tac": 1000,
+            "duration_s": 12.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-3DF728DD",
+      "submitted_at_s": 2.0029269999358803,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-2",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-2",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 4.138,
+          "intent_id": "INT-3DF728DD",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-2",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-2",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 9.153,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-3DF728DD",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 16.181,
+          "intent_id": "INT-3DF728DD",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "owner": "Anonymous",
+      "at_s": 4.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 40.0,
+            "tac": 1000,
+            "duration_s": 12.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-A6F3621D",
+      "submitted_at_s": 4.009659699979238,
+      "final_state": "REJECTED",
+      "selected_domains": null,
+      "attempts": [
+        {
+          "ran": "ran-1",
+          "core": "core-1",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "40 MHz requested, 20 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 20.0,
+              "num_ues": 500
+            }
+          }
+        },
+        {
+          "ran": "ran-2",
+          "core": "core-1",
+          "ran_ok": false,
+          "core_ok": true,
+          "reasons": {
+            "ran": "40 MHz requested, 20 MHz available"
+          },
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 20.0,
+              "num_ues": 500
+            }
+          }
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Feasibility check failed for all 2 candidate(s); last: ran-2: 40 MHz requested, 20 MHz available.",
+      "history": [
+        {
+          "t_s": 4.02,
+          "intent_id": "INT-A6F3621D",
+          "message": "Attempt 1/2 rejected (ran-1: 40 MHz requested, 20 MHz available), trying next candidate.",
+          "attempts": [
+            {
+              "ran": "ran-1",
+              "core": "core-1",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "40 MHz requested, 20 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 20.0,
+                  "num_ues": 500
+                }
+              }
+            }
+          ]
+        },
+        {
+          "t_s": 4.075,
+          "intent_id": "INT-A6F3621D",
+          "current_handling_state": "REJECTED",
+          "message": "Feasibility check failed for all 2 candidate(s); last: ran-2: 40 MHz requested, 20 MHz available.",
+          "attempts": [
+            {
+              "ran": "ran-1",
+              "core": "core-1",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "40 MHz requested, 20 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 20.0,
+                  "num_ues": 500
+                }
+              }
+            },
+            {
+              "ran": "ran-2",
+              "core": "core-1",
+              "ran_ok": false,
+              "core_ok": true,
+              "reasons": {
+                "ran": "40 MHz requested, 20 MHz available"
+              },
+              "proposals": {
+                "ran": {
+                  "bandwidth_mhz": 20.0,
+                  "num_ues": 500
+                }
+              }
+            }
+          ],
+          "proposals": {
+            "ran": {
+              "bandwidth_mhz": 20.0,
+              "num_ues": 500
+            }
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "owner": "Anonymous",
+      "at_s": 18.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 40.0,
+            "tac": 1000,
+            "duration_s": 5.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-22AF5EAD",
+      "submitted_at_s": 18.009687699959613,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-1",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-1",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 20.135,
+          "intent_id": "INT-22AF5EAD",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-1",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-1",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 25.15,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-22AF5EAD",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 25.183,
+          "intent_id": "INT-22AF5EAD",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-1",
+      "attempts": 1,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 1,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-2",
+      "attempts": 1,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 2,
+      "final_state": "REJECTED",
+      "attempts": 2,
+      "message_contains": "40 MHz requested, 20 MHz available",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 3,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-1",
+      "attempts": 1,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

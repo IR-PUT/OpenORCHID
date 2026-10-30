@@ -1,36 +1,93 @@
 import json
+import time
 import asyncio
 import uuid
+from dataclasses import dataclass
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from loguru import logger as log
 
+from idmo_system.domains.behavior import DomainEvent
+
+
+@dataclass
+class FeasibilityResult:
+    ok: bool
+    proposals: dict | None = None # What the domain could offer instead, e.g. {"bandwidth_mhz": 100}
+    reason: str | None = None # Why the request was rejected
+
+
 class BaseDomainBroker:
-    def __init__(self, domain_type, kafka_bootstrap="localhost:9092"):
+    HOLD_TTL_S = 30.0 # Resources held after a positive feasibility answer are freed if not provisioned in time
+
+    def __init__(self, domain_type, capabilities: dict, domain_name=None, kafka_bootstrap="localhost:9092"):
         self._domain_type = domain_type
+        self.capabilities = capabilities
+        # Domain name must be unique - the registry derives the domain ID (and Kafka topics) from it.
+        self._domain_name = domain_name or f"{domain_type}-{uuid.uuid4().hex[:6]}"
         self.kafka_bootstrap = kafka_bootstrap
         
         self._domain_unique_id = None
         self._topic_idmo_to_domain = None
         self._topic_domain_to_idmo = None
         self._service_listeners = {}
+        # intent_id -> {"amounts": {resource: amount}, "attempt": n, "confirmed": bool, "since": t}
+        # Held on a positive feasibility answer, confirmed on provisioning, released on termination.
+        self._reservations = {}
         
         self._temporary_domain_id = f"temp_{domain_type}_{uuid.uuid4().hex[:6]}"
         self.producer = None
+
+        self._tasks = set() # Background tasks, cancelled by stop()
+        self._heartbeat_enabled = True
+
+    @property
+    def domain_name(self) -> str:
+        return self._domain_name
+
+    async def start(self):
+        await self.run(self.capabilities)
+
+    def _spawn(self, coro) -> asyncio.Task:
+        """Starts a background task owned by this domain."""
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    async def stop(self):
+        """Cancels all background work of the domain (listeners, heartbeats, telemetry) and closes its producer."""
+        tasks = list(self._tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        if self.producer is not None:
+            producer, self.producer = self.producer, None
+            await producer.stop()
+
+    async def apply_event(self, event: DomainEvent):
+        """Injects a scenario event (fault) into the domain."""
+        log.warning(f"Domain {self._domain_name}: EVENT {event.action}")
+        if event.action == "stop_heartbeat":
+            self._heartbeat_enabled = False
+        elif event.action == "crash":
+            await self.stop()
+        else:
+            raise ValueError(f"{self._domain_type} domain does not support event '{event.action}'")
 
     async def run(self, capabilities):
         self.producer = AIOKafkaProducer(bootstrap_servers=self.kafka_bootstrap)
         await self.producer.start()
 
-        asyncio.create_task(self._subscribe_to_registration_responses())
+        self._spawn(self._subscribe_to_registration_responses())
         
         await asyncio.sleep(1.0) 
 
-        log.info(f'Sending registration request for {self._domain_type}...')
+        log.info(f'Sending registration request for {self._domain_name} ({self._domain_type})...')
         reg_msg = {
             "message_type": "DomainRegistrationRequest",
             "source_module": self._temporary_domain_id,
             "target_module": 'IDMO',
-            "domain_name": f"Domain_{self._domain_type}",
+            "domain_name": self._domain_name,
             "domain_type": self._domain_type,
             "capabilities": capabilities
         }
@@ -49,7 +106,8 @@ class BaseDomainBroker:
             "unity6g.domain.registration.response",
             bootstrap_servers=self.kafka_bootstrap,
             group_id=f"group_{self._temporary_domain_id}",
-            auto_offset_reset='earliest' # Gwarancja, że nie przegapimy odpowiedzi
+            auto_offset_reset='earliest', # Guarantees we do not miss the response
+            enable_auto_commit=False # See _subscribe_to_direct_commands
         )
         await consumer.start()
         try:
@@ -74,8 +132,8 @@ class BaseDomainBroker:
 
             self._heartbeat_interval = raw_message.get("heartbeat_interval_s", 30.0)
             # Start command listener immediately to avoid missing early feasibility requests.
-            asyncio.create_task(self._subscribe_to_direct_commands())
-            asyncio.create_task(self._heartbeat_loop())
+            self._spawn(self._subscribe_to_direct_commands())
+            self._spawn(self._heartbeat_loop())
         else:
             log.error(f"Failed to register domain: {raw_message.get('message')}")
 
@@ -83,7 +141,8 @@ class BaseDomainBroker:
         log.info(f"Heartbeat loop started. Interval: {self._heartbeat_interval}s")
         while self._domain_unique_id:
             try:
-                await self.send_heartbeat()
+                if self._heartbeat_enabled:
+                    await self.send_heartbeat()
                 await asyncio.sleep(self._heartbeat_interval)
             except Exception as e:
                 log.error(f"Heartbeat error: {e}")
@@ -107,14 +166,23 @@ class BaseDomainBroker:
         consumer = AIOKafkaConsumer(
             self._topic_idmo_to_domain,
             bootstrap_servers=self.kafka_bootstrap,
-            group_id=f"group_{self._domain_unique_id}"
-        )
+            group_id=f"group_{self._domain_unique_id}",
+            # The topic is dedicated to this domain and the registry may route requests to it
+            # before this consumer starts - read it from the beginning so nothing is missed.
+            auto_offset_reset='earliest',
+            # Topics of this domain can be deleted while it runs (e.g. when it is declared lost); with autocommit
+            # the consumer would retry committing to the deleted topic forever and its stop() would hang.
+            enable_auto_commit=False
+)
         await consumer.start()
         log.info(f'Subscribed to direct topic {self._topic_idmo_to_domain}')
-        
-        async for msg in consumer:
-            raw_message = json.loads(msg.value.decode())
-            await self.receive_direct_message_from_idmo(raw_message)
+
+        try:
+            async for msg in consumer:
+                raw_message = json.loads(msg.value.decode())
+                await self.receive_direct_message_from_idmo(raw_message)
+        finally:
+            await consumer.stop()
 
     async def receive_direct_message_from_idmo(self, raw_message: dict) -> None:
         
@@ -126,17 +194,29 @@ class BaseDomainBroker:
 
         if msg_type == "FeasibilityCheckRequest":
             await self._process_feasibility(raw_message)
+        elif msg_type == "FeasibilityRelease":
+            self.release_hold(intent_id, raw_message.get("attempt", 0))
         elif msg_type == "ServiceOrderRequestDispatch": #
             await self._process_provisioning(raw_message, service_topic)
 
     async def _process_feasibility(self, data):
-        result, proposals = await self.handle_feasibility(data)
+        intent_id = data.get("intent_id")
+        # A new attempt for the same intent replaces a previous, not yet provisioned hold.
+        self.release_hold(intent_id, attempt=None)
+
+        result = await self.handle_feasibility(data)
+        if result.ok:
+            self.hold(intent_id, data.get("attempt", 0), self.resources_for(data))
+        else:
+            log.warning(f"Domain {self._domain_unique_id}: Rejecting {intent_id} - {result.reason}")
         response = {
             "message_type": "FeasibilityCheckResponse",
             "intent_id": data.get("intent_id"),
+            "attempt": data.get("attempt", 0),
             "domain_type": self._domain_type,
-            "status": result,
-            "proposals": proposals,
+            "status": result.ok,
+            "proposals": result.proposals,
+            "reason": result.reason,
             "source_module": self._domain_unique_id,
             "target_module": "IDMO"
         }
@@ -145,6 +225,7 @@ class BaseDomainBroker:
         log.info(f"Sent feasibility response to {self._topic_domain_to_idmo}")
 
     async def _process_provisioning(self, data, service_topic):
+        self.confirm(data.get("intent_id"), self.resources_for(data))
         resource_id = await self.handle_provisioning(data)
         activation_report = {
             "message_type": "ServiceChangeStatus",
@@ -161,7 +242,7 @@ class BaseDomainBroker:
 
         if service_topic not in self._service_listeners:
             log.info(f"Broker: Starting dedicated listener for NEW service: {service_topic}")
-            task = asyncio.create_task(self._listen_to_service_topic(service_topic))
+            task = self._spawn(self._listen_to_service_topic(service_topic))
             self._service_listeners[service_topic] = task
 
         await self.setup_telemetry(data, service_topic)
@@ -173,7 +254,9 @@ class BaseDomainBroker:
         consumer = AIOKafkaConsumer(
             topic_name,
             bootstrap_servers=self.kafka_bootstrap,
-            group_id=f"group_{self._domain_unique_id}_{topic_name}"
+            group_id=f"group_{self._domain_unique_id}_{topic_name}",
+            auto_offset_reset='earliest', # A termination sent while the consumer is still joining must not be lost
+            enable_auto_commit=False # The service topic is deleted after termination
         )
         await consumer.start()
         
@@ -204,6 +287,7 @@ class BaseDomainBroker:
         intent_id = data.get("intent_id")
           
         log.warning(f"Domain {self._domain_unique_id}: Terminating service {intent_id}...")
+        self.release(intent_id)
         
         termination_report = {
             "message_type": "ServiceChangeStatus",
@@ -220,5 +304,54 @@ class BaseDomainBroker:
         )
         log.success(f"Termination confirmed for {intent_id}. Sending DEACTIVATED status.")
 
-    async def handle_feasibility(self, data): raise NotImplementedError
-    async def handle_provisioning(self, data): raise NotImplementedError
+    # --- Resource accounting -------------------------------------------------------------------
+
+    def hold(self, intent_id: str, attempt: int, amounts: dict):
+        """Reserves resources for a service that passed the feasibility check but is not provisioned yet."""
+        self._reservations[intent_id] = {"amounts": amounts, "attempt": attempt, "confirmed": False,
+                                         "since": time.monotonic()}
+
+    def confirm(self, intent_id: str, amounts: dict):
+        """Turns a hold into a reservation for a provisioned service (or reserves anew if the hold expired)."""
+        entry = self._reservations.get(intent_id)
+        if entry is None:
+            self._reservations[intent_id] = {"amounts": amounts, "attempt": None, "confirmed": True,
+                                             "since": time.monotonic()}
+        else:
+            entry["confirmed"] = True
+
+    def release_hold(self, intent_id: str, attempt: int | None):
+        """Frees a not yet provisioned hold; with an attempt number only if it belongs to that attempt."""
+        entry = self._reservations.get(intent_id)
+        if entry and not entry["confirmed"] and (attempt is None or entry["attempt"] == attempt):
+            del self._reservations[intent_id]
+
+    def release(self, intent_id: str):
+        self._reservations.pop(intent_id, None)
+
+    def _expire_holds(self):
+        now = time.monotonic()
+        for intent_id, entry in list(self._reservations.items()):
+            if not entry["confirmed"] and now - entry["since"] > self.HOLD_TTL_S:
+                log.warning(f"Domain {self._domain_name}: hold for {intent_id} expired.")
+                del self._reservations[intent_id]
+
+    def reserved(self, resource: str) -> float:
+        """Sum of a resource held or reserved by all services."""
+        self._expire_holds()
+        return sum(e["amounts"].get(resource, 0) for e in self._reservations.values())
+
+    @property
+    def active_services(self) -> int:
+        """Services held or provisioned in this domain."""
+        self._expire_holds()
+        return len(self._reservations)
+
+    # --- Domain specific logic ------------------------------------------------------------------
+
+    def resources_for(self, data) -> dict:
+        """Resources a service needs in this domain, e.g. {"bandwidth_mhz": 100}; held after a positive feasibility."""
+        return {}
+
+    async def handle_feasibility(self, data) -> FeasibilityResult: raise NotImplementedError
+    async def handle_provisioning(self, data) -> str: raise NotImplementedError # Returns a resource id

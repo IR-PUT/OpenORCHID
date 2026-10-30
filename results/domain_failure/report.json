@@ -1,0 +1,264 @@
+{
+  "scenario": "domain_failure",
+  "passed": true,
+  "elapsed_s": 32.8,
+  "registered_domains": [
+    "core-1",
+    "ran-a",
+    "ran-b",
+    "ran-c"
+  ],
+  "missing_domains": [],
+  "events": [
+    {
+      "t_s": 5.001,
+      "at_s": 5.0,
+      "domain": "ran-a",
+      "action": "crash",
+      "throughput_factor": 1.0,
+      "latency_factor": 1.0
+    },
+    {
+      "t_s": 5.002,
+      "at_s": 5.0,
+      "domain": "ran-c",
+      "action": "stop_heartbeat",
+      "throughput_factor": 1.0,
+      "latency_factor": 1.0
+    }
+  ],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 50.0,
+            "tac": 1000,
+            "duration_s": 60.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-0C747F87",
+      "submitted_at_s": 0.0004026999231427908,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-a",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-a",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Critical: Domain ran-a lost heartbeat.",
+      "history": [
+        {
+          "t_s": 2.137,
+          "intent_id": "INT-0C747F87",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-a",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-a",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 11.885,
+          "intent_id": "INT-0C747F87",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Critical: Domain ran-a lost heartbeat."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 50.0,
+            "tac": 2000,
+            "duration_s": 60.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-2409DF0B",
+      "submitted_at_s": 0.01156679994892329,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-c",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-c",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Critical: Domain ran-c lost heartbeat.",
+      "history": [
+        {
+          "t_s": 4.162,
+          "intent_id": "INT-2409DF0B",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-c",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-c",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 9.174,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-2409DF0B",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 11.885,
+          "intent_id": "INT-2409DF0B",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Critical: Domain ran-c lost heartbeat."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "owner": "Anonymous",
+      "at_s": 18.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "bandwidth_mhz": 50.0,
+            "tac": 1000,
+            "duration_s": 10.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-3859D1DB",
+      "submitted_at_s": 18.01070779992733,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-b",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-b",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 20.123,
+          "intent_id": "INT-3859D1DB",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-b",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-b",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 25.136,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-3859D1DB",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 30.198,
+          "intent_id": "INT-3859D1DB",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-a",
+      "message_contains": "ran-a lost heartbeat",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 1,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-c",
+      "message_contains": "ran-c lost heartbeat",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 2,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-b",
+      "core": "core-1",
+      "attempts": 1,
+      "message_contains": "lifecycle expired",
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

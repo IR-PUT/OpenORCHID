@@ -1,0 +1,24 @@
+11:08:42 | #0 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 40.0, 'tac': 1000, 'duration_s': 12.0}, 'core': {'priority': 1}}} -> INT-4E00B29B
+11:08:44 | #1 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 40.0, 'tac': 1000, 'duration_s': 12.0}, 'core': {'priority': 1}}} -> INT-3DF728DD
+11:08:44 | INT-4E00B29B update: {'intent_id': 'INT-4E00B29B', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-1', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:08:46 | #2 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 40.0, 'tac': 1000, 'duration_s': 12.0}, 'core': {'priority': 1}}} -> INT-A6F3621D
+11:08:46 | INT-A6F3621D update: {'intent_id': 'INT-A6F3621D', 'message': 'Attempt 1/2 rejected (ran-1: 40 MHz requested, 20 MHz available), trying next candidate.', 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': False, 'core_ok': True, 'reasons': {'ran': '40 MHz requested, 20 MHz available'}, 'proposals': {'ran': {'bandwidth_mhz': 20.0, 'num_ues': 500}}}]}
+11:08:46 | INT-A6F3621D update: {'intent_id': 'INT-A6F3621D', 'current_handling_state': 'REJECTED', 'message': 'Feasibility check failed for all 2 candidate(s); last: ran-2: 40 MHz requested, 20 MHz available.', 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': False, 'core_ok': True, 'reasons': {'ran': '40 MHz requested, 20 MHz available'}, 'proposals': {'ran': {'bandwidth_mhz': 20.0, 'num_ues': 500}}}, {'ran': 'ran-2', 'core': 'core-1', 'ran_ok': False, 'core_ok': True, 'reasons': {'ran': '40 MHz requested, 20 MHz available'}, 'proposals': {'ran': {'bandwidth_mhz': 20.0, 'num_ues': 500}}}], 'proposals': {'ran': {'bandwidth_mhz': 20.0, 'num_ues': 500}}}
+11:08:46 | INT-3DF728DD update: {'intent_id': 'INT-3DF728DD', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-2', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-2', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:08:49 | INT-4E00B29B update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-4E00B29B', 'current_handling_state': 'STATE_COMPLIES'}
+11:08:51 | INT-3DF728DD update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-3DF728DD', 'current_handling_state': 'STATE_COMPLIES'}
+11:08:56 | INT-4E00B29B update: {'intent_id': 'INT-4E00B29B', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:08:58 | INT-3DF728DD update: {'intent_id': 'INT-3DF728DD', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:09:00 | #3 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'bandwidth_mhz': 40.0, 'tac': 1000, 'duration_s': 5.0}, 'core': {'priority': 1}}} -> INT-22AF5EAD
+11:09:02 | INT-22AF5EAD update: {'intent_id': 'INT-22AF5EAD', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-1', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-1', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:09:07 | INT-22AF5EAD update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-22AF5EAD', 'current_handling_state': 'STATE_COMPLIES'}
+11:09:07 | INT-22AF5EAD update: {'intent_id': 'INT-22AF5EAD', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:09:07 | Scenario 'capacity_exhaustion' finished after 27.7s
+Registered domains: core-1, ran-1, ran-2
+ #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
+ 0    0.0  INT-4E00B29B  HANDLING_ENDED     ran-1+core-1                    1  -         Service lifecycle expired and resources released.
+ 1    2.0  INT-3DF728DD  HANDLING_ENDED     ran-2+core-1                    1  -         Service lifecycle expired and resources released.
+ 2    4.0  INT-A6F3621D  REJECTED           -                               2  -         Feasibility check failed for all 2 candidate(s); last: ran-2: 40 MHz requested, 20 MHz available.
+ 3   18.0  INT-22AF5EAD  HANDLING_ENDED     ran-1+core-1                    1  -         Service lifecycle expired and resources released.
+Expectations: 4/4 passed
+RESULT: PASSED

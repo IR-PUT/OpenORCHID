@@ -1,7 +1,7 @@
 from typing import ClassVar
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class BaseMessage(BaseModel):
@@ -21,6 +21,8 @@ class DomainType(StrEnum):
 
 
 class UnityCoreCapabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     cpu: int
     memory_gb: float
     storage_gb: float
@@ -28,11 +30,40 @@ class UnityCoreCapabilities(BaseModel):
 
 
 class UnityRanCapabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     maxNumberofUEs: int
     nROperatingBands: list[str] # e.g. ['n78', 'n258']
     coverageAreaTAList: list[tuple[int, int, int]] # TAI - Tracking Area Identity (mcc, mnc, tac) 
     positioning: bool
-    core_links: dict[str, float] = {}
+    core_links: dict[str, float] = {} # CORE domain name -> link latency [ms]
+
+
+class RanRFS(BaseModel):
+    """Resource Facing Service requested from a RAN domain. Missing values (None) are not constrained."""
+    model_config = ConfigDict(extra="forbid")
+
+    bandwidth_mhz: float | None = None
+    latency_ms: float | None = None
+    throughput_mbps: float | None = None
+    num_ues: int | None = None
+    tac: int | None = None # Tracking Area Code where the service is needed
+    duration_s: float | None = None
+
+
+class CoreRFS(BaseModel):
+    """Resource Facing Service requested from a CORE domain."""
+    model_config = ConfigDict(extra="forbid")
+
+    priority: int | None = None
+    latency_ms: float | None = None # Max RAN <-> CORE link latency
+
+
+class ResourceFacingService(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ran: RanRFS = RanRFS()
+    core: CoreRFS = CoreRFS()
 
 
 class DomainRegistrationRequest(BaseMessage):

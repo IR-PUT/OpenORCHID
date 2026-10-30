@@ -1,5 +1,6 @@
 import asyncio
 import re
+from typing import NamedTuple
 import sys
 import types
 from collections import defaultdict
@@ -11,6 +12,11 @@ class MockNewTopic:
         self.num_partitions = num_partitions
         self.replication_factor = replication_factor
         self.topic_configs = topic_configs or {}
+
+
+class MockTopicPartition(NamedTuple):
+    topic: str
+    partition: int
 
 
 class MockConsumerRecord:
@@ -52,12 +58,12 @@ class _MockKafkaBroker:
         offset = len(self.messages[topic])
         self.messages[topic].append((key, value))
 
-        # Fan-out do wszystkich pasujących subskrypcji.
+        # Fan-out to every matching subscription.
         for consumer in list(self.consumers):
             consumer._deliver_if_match(topic, key, value, offset)
 
     def replay_for_consumer(self, consumer):
-        # Przy auto_offset_reset=earliest dorzucamy historię.
+        # With auto_offset_reset=earliest, replay the topic history.
         if getattr(consumer, "auto_offset_reset", None) != "earliest":
             return
 
@@ -70,14 +76,14 @@ class _MockKafkaBroker:
                 consumer._offsets[topic] = len(self.messages[topic])
 
 
-if not hasattr(sys, "_mock_kafka_broker"):
-    sys._mock_kafka_broker = _MockKafkaBroker()
+# Single in-process "cluster" shared by every mock client.
+_BROKER = _MockKafkaBroker()
 
 
 class MockAIOKafkaAdminClient:
     def __init__(self, bootstrap_servers, loop=None, **kwargs):
         self.bootstrap_servers = bootstrap_servers
-        self._broker = sys._mock_kafka_broker
+        self._broker = _BROKER
 
     async def start(self):
         await asyncio.sleep(0)
@@ -109,7 +115,7 @@ class MockAIOKafkaAdminClient:
 class MockAIOKafkaProducer:
     def __init__(self, bootstrap_servers, loop=None, **kwargs):
         self.bootstrap_servers = bootstrap_servers
-        self._broker = sys._mock_kafka_broker
+        self._broker = _BROKER
 
     async def start(self):
         await asyncio.sleep(0)
@@ -152,7 +158,7 @@ class MockAIOKafkaConsumer:
         self.group_id = group_id
         self.auto_offset_reset = auto_offset_reset
 
-        self._broker = sys._mock_kafka_broker
+        self._broker = _BROKER
         self._queue = asyncio.Queue()
         self._is_closed = True
 
@@ -181,11 +187,11 @@ class MockAIOKafkaConsumer:
             self._pattern = None
             self._topics = set(topics)
 
-        # Upewniamy się, że subskrybowane tematy istnieją.
+        # Make sure subscribed topics exist.
         for t in self._topics:
             self._broker.create_topic(t)
 
-        # Po zmianie subskrypcji dociągnij historię przy earliest.
+        # After a subscription change, replay history for earliest.
         self._broker.replay_for_consumer(self)
 
     def _matches(self, topic):
@@ -197,7 +203,7 @@ class MockAIOKafkaConsumer:
         if not self._matches(topic):
             return
 
-        # Przy earliest unikamy duplikatów z replay.
+        # With earliest, skip messages already delivered by replay.
         if self.auto_offset_reset == "earliest":
             if offset < self._offsets[topic]:
                 return
@@ -210,8 +216,11 @@ class MockAIOKafkaConsumer:
             raise StopAsyncIteration
         return await self._queue.get()
 
+    async def commit(self, offsets=None):
+        await asyncio.sleep(0)
+
     async def get_many(self, timeout_ms=0, max_records=None):
-        # Wystarczy kompatybilność API; adapter nie używa wyniku.
+        # API compatibility only; the adapter ignores the result.
         if timeout_ms and timeout_ms > 0:
             await asyncio.sleep(timeout_ms / 1000.0)
         return {}
@@ -225,16 +234,26 @@ class MockAIOKafkaConsumer:
         return await self.getone()
 
 
-# Monkey patch modułu aiokafka.
-mock_main_mod = types.ModuleType("aiokafka")
-mock_main_mod.AIOKafkaProducer = MockAIOKafkaProducer
-mock_main_mod.AIOKafkaConsumer = MockAIOKafkaConsumer
+def reset():
+    """Forget all topics, messages and consumers (e.g. between two scenario runs in one process)."""
+    _BROKER.__init__()
 
-mock_admin_mod = types.ModuleType("aiokafka.admin")
-mock_admin_mod.AIOKafkaAdminClient = MockAIOKafkaAdminClient
-mock_admin_mod.NewTopic = MockNewTopic
 
-mock_main_mod.admin = mock_admin_mod
+def install():
+    """Replace the aiokafka modules in sys.modules with in-process mocks.
 
-sys.modules["aiokafka"] = mock_main_mod
-sys.modules["aiokafka.admin"] = mock_admin_mod
+    Must be called before any module that imports aiokafka is imported.
+    """
+    mock_main_mod = types.ModuleType("aiokafka")
+    mock_main_mod.AIOKafkaProducer = MockAIOKafkaProducer
+    mock_main_mod.AIOKafkaConsumer = MockAIOKafkaConsumer
+    mock_main_mod.TopicPartition = MockTopicPartition
+
+    mock_admin_mod = types.ModuleType("aiokafka.admin")
+    mock_admin_mod.AIOKafkaAdminClient = MockAIOKafkaAdminClient
+    mock_admin_mod.NewTopic = MockNewTopic
+
+    mock_main_mod.admin = mock_admin_mod
+
+    sys.modules["aiokafka"] = mock_main_mod
+    sys.modules["aiokafka.admin"] = mock_admin_mod

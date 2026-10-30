@@ -1,0 +1,25 @@
+11:10:43 | #0 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'latency_ms': 20.0, 'throughput_mbps': 80.0, 'tac': 1000, 'duration_s': 15.0}, 'core': {'priority': 1}}} -> INT-1B67BEF7
+11:10:43 | #1 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'latency_ms': 20.0, 'throughput_mbps': 80.0, 'tac': 2000, 'duration_s': 15.0}, 'core': {'priority': 1}}} -> INT-F232EB09
+11:10:43 | #2 submitted: {'intent_owner': 'Anonymous', 'rfs': {'ran': {'latency_ms': 20.0, 'throughput_mbps': 80.0, 'tac': 3000, 'duration_s': 15.0}, 'core': {'priority': 1}}} -> INT-87C2312C
+11:10:45 | INT-1B67BEF7 update: {'intent_id': 'INT-1B67BEF7', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-aging', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-aging', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:10:46 | INT-1B67BEF7 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-1B67BEF7', 'current_handling_state': 'STATE_COMPLIES'}
+11:10:47 | INT-F232EB09 update: {'intent_id': 'INT-F232EB09', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-event', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-event', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:10:48 | EVENT {'t_s': 5.011, 'at_s': 5.0, 'domain': 'ran-event', 'action': 'degrade', 'throughput_factor': 0.5, 'latency_factor': 3.0}
+11:10:48 | INT-F232EB09 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-F232EB09', 'current_handling_state': 'STATE_DEGRADES'}
+11:10:49 | INT-1B67BEF7 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-1B67BEF7', 'current_handling_state': 'STATE_DEGRADES'}
+11:10:49 | INT-87C2312C update: {'intent_id': 'INT-87C2312C', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-noisy', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-noisy', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:10:50 | INT-87C2312C update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-87C2312C', 'current_handling_state': 'STATE_COMPLIES'}
+11:10:53 | EVENT {'t_s': 10.005, 'at_s': 10.0, 'domain': 'ran-event', 'action': 'restore', 'throughput_factor': 1.0, 'latency_factor': 1.0}
+11:10:53 | INT-F232EB09 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-F232EB09', 'current_handling_state': 'STATE_COMPLIES'}
+11:11:00 | INT-1B67BEF7 update: {'intent_id': 'INT-1B67BEF7', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:11:02 | INT-F232EB09 update: {'intent_id': 'INT-F232EB09', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:11:04 | INT-87C2312C update: {'intent_id': 'INT-87C2312C', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:11:04 | Scenario 'sla_degradation' finished after 23.8s
+Registered domains: core-1, ran-aging, ran-event, ran-noisy
+ #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
+ 0    0.0  INT-1B67BEF7  HANDLING_ENDED     ran-aging+core-1                1  degraded  Service lifecycle expired and resources released.
+ 1    0.0  INT-F232EB09  HANDLING_ENDED     ran-event+core-1                1  degraded  Service lifecycle expired and resources released.
+ 2    0.0  INT-87C2312C  HANDLING_ENDED     ran-noisy+core-1                1  -         Service lifecycle expired and resources released.
+Events: degrade ran-event @5.0s, restore ran-event @10.0s
+Expectations: 3/3 passed
+RESULT: PASSED

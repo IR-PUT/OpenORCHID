@@ -1,0 +1,18 @@
+11:09:12 | #0 submitted: {'intent_owner': 'visitors-wifi', 'rfs': {'ran': {'bandwidth_mhz': 40.0, 'tac': 1000, 'duration_s': 15.0}, 'core': {'priority': 3}}} -> INT-8CADE0F7
+11:09:14 | #1 submitted: {'intent_owner': 'video-archive', 'rfs': {'ran': {'bandwidth_mhz': 30.0, 'tac': 1000, 'duration_s': 15.0}, 'core': {'priority': 2}}} -> INT-D20246B4
+11:09:14 | INT-D20246B4 update: {'intent_id': 'INT-D20246B4', 'current_handling_state': 'REJECTED', 'message': 'Feasibility check failed for all 1 candidate(s); last: ran-hospital: 30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services).', 'attempts': [{'ran': 'ran-hospital', 'core': 'core-1', 'ran_ok': False, 'core_ok': True, 'reasons': {'ran': '30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services)'}, 'proposals': {'ran': {'bandwidth_mhz': 10.0}}}], 'proposals': {'ran': {'bandwidth_mhz': 10.0}}}
+11:09:14 | INT-8CADE0F7 update: {'intent_id': 'INT-8CADE0F7', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-hospital', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-hospital', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:09:16 | #2 submitted: {'intent_owner': 'emergency-team', 'rfs': {'ran': {'bandwidth_mhz': 50.0, 'tac': 1000, 'duration_s': 15.0}, 'core': {'priority': 1}}} -> INT-D34BC3A7
+11:09:18 | INT-D34BC3A7 update: {'intent_id': 'INT-D34BC3A7', 'lifecycle_status': 'ACTIVE', 'message': 'Service is fully operational.', 'selected_domains': {'ran': 'ran-hospital', 'core': 'core-1'}, 'attempts': [{'ran': 'ran-hospital', 'core': 'core-1', 'ran_ok': True, 'core_ok': True, 'reasons': {}, 'proposals': {}}]}
+11:09:19 | INT-8CADE0F7 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-8CADE0F7', 'current_handling_state': 'STATE_COMPLIES'}
+11:09:23 | INT-D34BC3A7 update: {'message_type': 'IntentStatusUpdate', 'intent_id': 'INT-D34BC3A7', 'current_handling_state': 'STATE_COMPLIES'}
+11:09:29 | INT-8CADE0F7 update: {'intent_id': 'INT-8CADE0F7', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:09:33 | INT-D34BC3A7 update: {'intent_id': 'INT-D34BC3A7', 'current_handling_state': 'HANDLING_ENDED', 'message': 'Service lifecycle expired and resources released.'}
+11:09:33 | Scenario 'custom_domain' finished after 23.7s
+Registered domains: core-1, ran-hospital
+ #   at_s  intent_id     final state        domains (RAN+CORE)          tries  SLA       last message
+ 0    0.0  INT-8CADE0F7  HANDLING_ENDED     ran-hospital+core-1             1  -         Service lifecycle expired and resources released.
+ 1    2.0  INT-D20246B4  REJECTED           -                               1  -         Feasibility check failed for all 1 candidate(s); last: ran-hospital: 30 MHz requested, 10 MHz available (50 MHz kept for priority-1 services).
+ 2    4.0  INT-D34BC3A7  HANDLING_ENDED     ran-hospital+core-1             1  -         Service lifecycle expired and resources released.
+Expectations: 3/3 passed
+RESULT: PASSED

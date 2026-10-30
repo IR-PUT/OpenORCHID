@@ -1,70 +1,60 @@
-from pydantic import BaseModel
 import aiohttp
 import json
+from loguru import logger as log
 
+from idmo_system.communication.api import CoreRFS, RanRFS, ResourceFacingService
 
-class RanResourceFacingService(BaseModel):
-    bandwidth_mhz: float
-    latency_ms: float
-
-
-class CoreResourceFacingService(BaseModel):
-    priority: int
-    latency_ms: float
-
-
-class ResourceFacingService(BaseModel):
-    ran: RanResourceFacingService | None = None 
-    core: CoreResourceFacingService | None = None 
+# Few-shot examples. The answers are serialized from the RFS models, so field names and their order always match
+# the JSON schema the LLM output is constrained to (a different order in the examples confuses small models).
+EXAMPLES = [
+    ("We need a RAN with 100MHz bandwidth and 10ms latency. The core network should have 15ms latency and priority 1.",
+     ResourceFacingService(ran=RanRFS(bandwidth_mhz=100, latency_ms=10), core=CoreRFS(priority=1, latency_ms=15))),
+    ("Set up a slice for 20 seconds with core priority 2 and 50ms latency. RAN bandwidth must be 20 MHz in TA 1000.",
+     ResourceFacingService(ran=RanRFS(bandwidth_mhz=20, tac=1000, duration_s=20), core=CoreRFS(priority=2, latency_ms=50))),
+]
 
 
 class IntentTranslator:
-    def __init__(self, llm_address: str = "http://localhost:11434/api/generate"):
+    def __init__(self, llm_address: str = "http://localhost:11434/api/generate", model: str = "qwen2.5-coder:1.5b"):
         self._llm_address = llm_address
-        self._model = "qwen2.5-coder:1.5b"
+        self._model = model
 
-        self._prompt = """You are a strict data extraction tool. Extract network requirements from the text into the exact JSON schema provided. 
-        Rules:
-        - Respond ONLY with the raw JSON object.
-        - Do NOT include markdown blocks (```json), formatting, or explanations.
-        - If a value is missing, use null.
+        examples = "\n\n".join(f"Input: {text}\nOutput: {rfs.model_dump_json()}" for text, rfs in EXAMPLES)
+        self._prompt = (
+            "You are a strict data extraction tool. Extract network requirements from the text into the exact JSON "
+            "schema provided.\n"
+            "Rules:\n"
+            "- Respond ONLY with the raw JSON object.\n"
+            "- Do NOT include markdown blocks (```json), formatting, or explanations.\n"
+            "- If a value is missing, use null.\n\n"
+            f"### Examples:\n{examples}\n\n"
+            "### Input Text:\n"
+        )
 
-        ### Examples:
-        Input: We need a RAN with 100MHz bandwidth and 10ms latency. The core network should have 15ms latency and priority 1.
-        Output: {"ran": {"bandwidth": 100, "latency": 10}, "core": {"latency": 15, "priority": 1}}
-
-        Input: Set up a slice with core priority 2 and 50ms latency. RAN bandwidth must be 20.
-        Output: {"ran": {"bandwidth": 20, "latency": null}, "core": {"latency": 50, "priority": 2}}
-
-        ### Input Text:
-        """
-
-
-    async def translate_to_rfs(self, expression: str) -> dict:
+    async def translate_to_rfs(self, expression: str) -> dict | None:
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(self._llm_address, json={
                     "model": self._model,
                     "prompt": self._prompt + expression,
-                    "format": ResourceFacingService.model_json_schema(),  
+                    "format": ResourceFacingService.model_json_schema(),
                     "stream": False,
                     "options": {
                         "temperature": 0.01
                     }
                     }) as resp:
                     response = await resp.json()
-            except aiohttp.client_exceptions.ClientConnectorError as ex: 
+            except aiohttp.client_exceptions.ClientConnectorError as e:
+                log.error(f"Translator: LLM not reachable at {self._llm_address}: {e}")
                 return None
 
-        specification = None
-        try:
-            result = json.loads(response["response"])
-            specification = ResourceFacingService(**result)
-        except Exception as e:
+        if "error" in response:
+            log.error(f"Translator: LLM error (model {self._model}): {response['error']}")
             return None
 
-        return specification.model_dump() if specification else None
-        return {
-            "ran": {"bandwidth": 100, "latency": 10},
-            "core": {"latency": 15, "priority": 1}
-        }
+        try:
+            result = json.loads(response["response"])
+            return ResourceFacingService(**result).model_dump()
+        except Exception as e:
+            log.warning(f"Translator: LLM answer is not a valid RFS ({e}): {response.get('response')!r}")
+            return None

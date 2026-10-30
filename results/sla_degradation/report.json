@@ -1,0 +1,283 @@
+{
+  "scenario": "sla_degradation",
+  "passed": true,
+  "elapsed_s": 23.77,
+  "registered_domains": [
+    "core-1",
+    "ran-aging",
+    "ran-event",
+    "ran-noisy"
+  ],
+  "missing_domains": [],
+  "events": [
+    {
+      "t_s": 5.011,
+      "at_s": 5.0,
+      "domain": "ran-event",
+      "action": "degrade",
+      "throughput_factor": 0.5,
+      "latency_factor": 3.0
+    },
+    {
+      "t_s": 10.005,
+      "at_s": 10.0,
+      "domain": "ran-event",
+      "action": "restore",
+      "throughput_factor": 1.0,
+      "latency_factor": 1.0
+    }
+  ],
+  "intents": [
+    {
+      "index": 0,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "latency_ms": 20.0,
+            "throughput_mbps": 80.0,
+            "tac": 1000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-1B67BEF7",
+      "submitted_at_s": 0.0008626000490039587,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-aging",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-aging",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": true,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 2.14,
+          "intent_id": "INT-1B67BEF7",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-aging",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-aging",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 3.141,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-1B67BEF7",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 6.184,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-1B67BEF7",
+          "current_handling_state": "STATE_DEGRADES"
+        },
+        {
+          "t_s": 17.175,
+          "intent_id": "INT-1B67BEF7",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "latency_ms": 20.0,
+            "throughput_mbps": 80.0,
+            "tac": 2000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-F232EB09",
+      "submitted_at_s": 0.01344989996869117,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-event",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-event",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": true,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 4.158,
+          "intent_id": "INT-F232EB09",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-event",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-event",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 5.17,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-F232EB09",
+          "current_handling_state": "STATE_DEGRADES"
+        },
+        {
+          "t_s": 10.242,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-F232EB09",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 19.22,
+          "intent_id": "INT-F232EB09",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "owner": "Anonymous",
+      "at_s": 0.0,
+      "request": {
+        "rfs": {
+          "ran": {
+            "latency_ms": 20.0,
+            "throughput_mbps": 80.0,
+            "tac": 3000,
+            "duration_s": 15.0
+          },
+          "core": {
+            "priority": 1
+          }
+        }
+      },
+      "intent_id": "INT-87C2312C",
+      "submitted_at_s": 0.019229199970141053,
+      "final_state": "HANDLING_ENDED",
+      "selected_domains": {
+        "ran": "ran-noisy",
+        "core": "core-1"
+      },
+      "attempts": [
+        {
+          "ran": "ran-noisy",
+          "core": "core-1",
+          "ran_ok": true,
+          "core_ok": true,
+          "reasons": {},
+          "proposals": {}
+        }
+      ],
+      "sla_degraded": false,
+      "last_message": "Service lifecycle expired and resources released.",
+      "history": [
+        {
+          "t_s": 6.185,
+          "intent_id": "INT-87C2312C",
+          "lifecycle_status": "ACTIVE",
+          "message": "Service is fully operational.",
+          "selected_domains": {
+            "ran": "ran-noisy",
+            "core": "core-1"
+          },
+          "attempts": [
+            {
+              "ran": "ran-noisy",
+              "core": "core-1",
+              "ran_ok": true,
+              "core_ok": true,
+              "reasons": {},
+              "proposals": {}
+            }
+          ]
+        },
+        {
+          "t_s": 7.194,
+          "message_type": "IntentStatusUpdate",
+          "intent_id": "INT-87C2312C",
+          "current_handling_state": "STATE_COMPLIES"
+        },
+        {
+          "t_s": 21.208,
+          "intent_id": "INT-87C2312C",
+          "current_handling_state": "HANDLING_ENDED",
+          "message": "Service lifecycle expired and resources released."
+        }
+      ]
+    }
+  ],
+  "expectations": [
+    {
+      "intent": 0,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-aging",
+      "sla_degraded": true,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 1,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-event",
+      "sla_degraded": true,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "intent": 2,
+      "final_state": "HANDLING_ENDED",
+      "ran": "ran-noisy",
+      "sla_degraded": false,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import asyncio
 import nats
@@ -10,17 +11,21 @@ from idmo_system.communication.api import (
 )
 
 class DomainCapabilityRegistration:
-    def __init__(self, heartbeat_interval_s=10.0, max_missed_heartbeats=3):
+    def __init__(self, nats_url="nats://localhost:4222", heartbeat_interval_s=10.0, max_missed_heartbeats=3,
+                 pending_timeout_s=30.0):
+        self.nats_url = nats_url
         self.nc = None
         self.domain_repository = {} 
         self._heartbeat_interval_s = heartbeat_interval_s
         self._max_missed_heartbeats = max_missed_heartbeats
         
         self._timeout_threshold = self._heartbeat_interval_s * self._max_missed_heartbeats
+        # A PENDING domain is still being set up (topics, consumers) - give it more time for its first heartbeat.
+        self._pending_timeout_s = max(pending_timeout_s, self._timeout_threshold)
 
     async def connect(self):
         """Connect to NATS and subscribe to Registration and Heartbeat events."""
-        self.nc = await nats.connect("nats://localhost:4222")
+        self.nc = await nats.connect(self.nats_url)
 
         
         await self.nc.subscribe("domain.registration.request", cb=self.handle_registration)
@@ -45,18 +50,28 @@ class DomainCapabilityRegistration:
         """Handles DomainRegistrationRequest and initializes the heartbeat timer."""
         try:
             request = DomainRegistrationRequest.model_validate_json(msg.data)
-            
-            
-            domain_type_str = request.domain_type.value
-            existing_count = sum(1 for d in self.domain_repository.values() if d['type'] == request.domain_type)
-            domain_id = f"domain_{domain_type_str}_{existing_count + 1}"
+
+            domain_id = self._domain_id_from_name(request.domain_name)
+
+            if domain_id in self.domain_repository:
+                log.error(f"Registration rejected: domain {domain_id} is already registered.")
+                response = DomainRegistrationResponse(
+                    source_module="IDMO_REGISTRY",
+                    target_module=request.source_module,
+                    status=False,
+                    message=f"Domain name '{request.domain_name}' is already registered."
+                )
+                await self.nc.publish("domain.registration.ack", response.model_dump_json().encode())
+                return
 
             # Store in Repository with a timestamp
             self.domain_repository[domain_id] = {
                 "domain_id": domain_id,
+                "domain_name": request.domain_name,
                 "type": request.domain_type,
-                "capabilities": request.capabilities,
-                "status": "UP",
+                "capabilities": request.capabilities.model_dump(),
+                # UP only after the first heartbeat - until then the domain may not be able to receive requests yet.
+                "status": "PENDING",
                 "last_heartbeat": time.time(), # Initial timestamp
                 "source_module": request.source_module
             }
@@ -79,6 +94,11 @@ class DomainCapabilityRegistration:
         except Exception as e:
             log.error(f"Registration Error: {e}")
 
+    @staticmethod
+    def _domain_id_from_name(domain_name: str) -> str:
+        """Domain ID is used in Kafka topic names, so only [a-zA-Z0-9_-] characters are kept."""
+        return re.sub(r"[^a-zA-Z0-9_-]", "_", domain_name)
+
     async def handle_heartbeat(self, msg):
         """Processes DomainHealthMessage and updates 'last_heartbeat' timestamp."""
         try:
@@ -89,8 +109,9 @@ class DomainCapabilityRegistration:
 
             if domain_id in self.domain_repository:
                 self.domain_repository[domain_id]["last_heartbeat"] = time.time()
-                if self.domain_repository[domain_id]["status"] == "DOWN":
-                    log.info(f"Domain {domain_id} is back UP.")
+                previous_status = self.domain_repository[domain_id]["status"]
+                if previous_status != "UP":
+                    log.info(f"Domain {domain_id} is {'back ' if previous_status == 'DOWN' else ''}UP.")
                     self.domain_repository[domain_id]["status"] = "UP"
             else:
                 log.warning(f"Heartbeat from unknown domain: {domain_id}")
@@ -105,8 +126,9 @@ class DomainCapabilityRegistration:
             for domain_id in list(self.domain_repository.keys()):
                 info = self.domain_repository[domain_id]
                 time_since_last = current_time - info["last_heartbeat"]
+                timeout = self._pending_timeout_s if info["status"] == "PENDING" else self._timeout_threshold
                 
-                if time_since_last > self._timeout_threshold:
+                if time_since_last > timeout:
                     log.error(f"Domain {domain_id} TIMEOUT! Deleting from registry.")
                     
                     failure_event = {"domain_id": domain_id, "reason": "Timeout - Deleted"}
